@@ -1,0 +1,45 @@
+{
+  "_comment": "Shared conversion test vectors. Checked against BOTH the TypeScript preview engine (tests/unit) and the database engine (tests/db). Expected values were calculated by hand.",
+  "products": {
+    "chicken":   { "inventory_unit": "LB",  "conversions": { "CASE": "40" } },
+    "cheddar":   { "inventory_unit": "LB",  "conversions": { "CASE": "20", "SLICE": "0.046875" } },
+    "avocado":   { "inventory_unit": "EA",  "conversions": { "CASE": "48", "OZ": "0.166666666667" } },
+    "cream":     { "inventory_unit": "QT",  "conversions": { "CASE": "12" } },
+    "fries":     { "inventory_unit": "LB",  "conversions": { "CASE": "30", "BAG": "5" } },
+    "sanitizer": { "inventory_unit": "GAL", "conversions": { "CASE": "4" } }
+  },
+  "single": [
+    ["chicken", "1", "CASE", "40"],
+    ["chicken", "2.5", "CASE", "100"],
+    ["chicken", "8", "OZ", "0.5"],
+    ["chicken", "3", "LB", "3"],
+    ["chicken", "1", "KG", "2.2046"],
+    ["chicken", "100", "G", "0.2205"],
+    ["cheddar", "2", "SLICE", "0.0938"],
+    ["cheddar", "1", "CASE", "20"],
+    ["avocado", "1", "CASE", "48"],
+    ["avocado", "12", "OZ", "2"],
+    ["avocado", "1", "LB", "2.6667"],
+    ["avocado", "3", "EA", "3"],
+    ["cream", "1", "GAL", "4"],
+    ["cream", "16", "FL_OZ", "0.5"],
+    ["cream", "1", "CASE", "12"],
+    ["cream", "1", "L", "1.0567"],
+    ["fries", "2", "BAG", "10"],
+    ["fries", "1", "CASE", "30"],
+    ["sanitizer", "1", "QT", "0.25"]
+  ],
+  "components": [
+    ["chicken", [["1", "CASE"], ["8.5", "LB"]], "48.5"],
+    ["avocado", [["1", "CASE"], ["6", "EA"]], "54"],
+    ["cheddar", [["1", "CASE"], ["3", "SLICE"]], "20.1406"],
+    ["cream", [["2", "GAL"], ["3", "QT"]], "11"]
+  ],
+  "errors": [
+    ["chicken", "1", "GAL"],
+    ["chicken", "1", "BAG"],
+    ["cream", "1", "LB"],
+    ["avocado", "1", "GAL"],
+    ["chicken", "1", "XYZ"]
+  ]
+}
