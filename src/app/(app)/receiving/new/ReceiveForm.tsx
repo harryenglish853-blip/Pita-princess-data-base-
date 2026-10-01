@@ -309,7 +309,7 @@ function ReceiptDone({ result, vendorName, invoice, actor }: { result: Receiving
       </Card>
       <div className="grid gap-2">
         {/* full reload resets the form state */}
-        <a href="/receiving/new" className="inline-flex min-h-12 items-center justify-center rounded-xl bg-brand px-5 font-semibold text-white">Receive another delivery</a>
+        <Button size="lg" onClick={() => window.location.reload()}>Receive another delivery</Button>
         <Link href="/dashboard" className="text-center font-semibold text-brand">Done</Link>
       </div>
     </div>

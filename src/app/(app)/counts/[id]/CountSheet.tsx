@@ -200,7 +200,6 @@ export function CountSheet({ sheet }: { sheet: Sheet }) {
     const off = () => setOnline(false);
     window.addEventListener('online', on);
     window.addEventListener('offline', off);
-    setOnline(navigator.onLine);
     const t = window.setInterval(() => flush(), 15000);
     return () => { cancelled = true; window.removeEventListener('online', on); window.removeEventListener('offline', off); window.clearInterval(t); };
   }, [sessionId, entries, flush]);

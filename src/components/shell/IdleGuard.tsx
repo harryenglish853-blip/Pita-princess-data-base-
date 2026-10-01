@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { endEmployeeSession } from '@/lib/auth/actions';
 
 /**
@@ -9,6 +10,7 @@ import { endEmployeeSession } from '@/lib/auth/actions';
  * enforces the same timeout independently, so a sleeping tablet is also safe.
  */
 export function IdleGuard({ minutes }: { minutes: number }) {
+  const router = useRouter();
   const last = useRef(0);
   const firing = useRef(false);
   const [warn, setWarn] = useState(false);
@@ -26,7 +28,7 @@ export function IdleGuard({ minutes }: { minutes: number }) {
       if (firing.current) return;
       firing.current = true;
       endEmployeeSession('idle_timeout').catch(() => {
-        window.location.href = '/who?reason=idle';
+        router.replace('/who?reason=idle');
       });
     };
     const tick = () => {
@@ -44,7 +46,7 @@ export function IdleGuard({ minutes }: { minutes: number }) {
       document.removeEventListener('visibilitychange', onVisible);
       for (const e of events) window.removeEventListener(e, bump);
     };
-  }, [limit]);
+  }, [limit, router]);
 
   if (!warn) return null;
   return (

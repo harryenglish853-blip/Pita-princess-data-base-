@@ -53,3 +53,19 @@ export function resolveRange(preset: string | undefined, from: string | undefine
       return { preset: 'this_week' as RangePreset, from: addDays(today, -dow(today)), to: today };
   }
 }
+
+/** Converts inclusive calendar dates in the restaurant time zone to a UTC instant range [start, end). */
+export function instantRange(from: string, to: string, tz: string) {
+  const toUtc = (iso: string) => {
+    // Find the UTC instant whose wall-clock time in tz is iso 00:00.
+    const guess = new Date(`${iso}T00:00:00Z`);
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).formatToParts(guess);
+    const get = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+    const wall = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'));
+    return new Date(guess.getTime() - (wall - guess.getTime()));
+  };
+  const [y, m, d] = to.split('-').map(Number);
+  const next = new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+  return { start: toUtc(from).toISOString(), end: toUtc(next).toISOString() };
+}
+

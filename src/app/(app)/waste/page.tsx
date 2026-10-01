@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { requirePermission, can } from '@/lib/auth/context';
 import { query, rpc } from '@/lib/data';
 import type { Catalog } from '@/lib/types';
-import { fmtMoney, fmtQty, fmtTime, todayInTz, DEFAULT_TZ } from '@/lib/format';
+import { fmtMoney, fmtQty, fmtTime, DEFAULT_TZ } from '@/lib/format';
 import { Card, CardTitle, EmptyState, Table, Td, Th } from '@/components/ui';
 import { WasteForm } from './WasteForm';
 

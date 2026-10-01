@@ -1,11 +1,15 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useEffect } from 'react';
 import { signIn, type LoginState } from '@/lib/auth/actions';
 import { Alert, Button, Field, Input } from '@/components/ui';
 
 export function LoginForm() {
   const [state, action, pending] = useActionState<LoginState, FormData>(signIn, {});
+  // A new sign-in on this device must not see cached pages from the previous login.
+  useEffect(() => {
+    navigator.serviceWorker?.controller?.postMessage('clear-private-cache');
+  }, []);
   return (
     <form action={action} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       {state.error && <Alert title="Could not sign in">{state.error}</Alert>}
