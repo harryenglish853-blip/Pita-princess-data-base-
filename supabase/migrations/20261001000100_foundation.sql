@@ -543,8 +543,9 @@ grant select on public.account_profiles to authenticated;
 grant update (display_name, is_active, role, default_location_id) on public.account_profiles to authenticated;
 -- Login accounts and permission overrides are owner-only, even if accounts.manage
 -- were ever granted to another account (prevents privilege escalation).
+-- Management may see account names/roles (for "received by" etc.); only owners change them.
 create policy account_profiles_select on public.account_profiles for select to authenticated
-  using (id = (select auth.uid()) or (select app.is_owner()));
+  using (id = (select auth.uid()) or (select app.is_management()));
 create policy account_profiles_update on public.account_profiles for update to authenticated
   using ((select app.is_owner()))
   with check ((select app.is_owner()));

@@ -513,9 +513,16 @@ begin
   if p ? 'storage' then
     select coalesce(array_agg((s ->> 'storage_location_id')::uuid), '{}') into v_store_ids
       from jsonb_array_elements(p -> 'storage') s;
+    -- Only storage areas of the location being edited are replaced; other locations keep theirs.
+    if exists (select 1 from unnest(v_store_ids) sid
+                where not exists (select 1 from public.storage_locations where id = sid and location_id = v_loc)) then
+      perform app.fail('VALIDATION', 'Storage areas must belong to this location.');
+    end if;
     delete from public.product_storage_locations
-     where product_id = v_id and storage_location_id <> all (v_store_ids);
-    update public.product_storage_locations set is_primary = false where product_id = v_id;
+     where product_id = v_id and storage_location_id <> all (v_store_ids)
+       and storage_location_id in (select id from public.storage_locations where location_id = v_loc);
+    update public.product_storage_locations set is_primary = false
+     where product_id = v_id and storage_location_id in (select id from public.storage_locations where location_id = v_loc);
     for v_store in select * from jsonb_array_elements(p -> 'storage') loop
       select coalesce(max(sort_order), 0) + 10 into v_next_sort
         from public.product_storage_locations where storage_location_id = (v_store ->> 'storage_location_id')::uuid;
