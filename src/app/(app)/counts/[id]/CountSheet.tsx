@@ -83,7 +83,6 @@ export function CountSheet({ sheet }: { sheet: Sheet }) {
   const [finishMsg, setFinishMsg] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [pending, start] = useTransition();
-  const timers = useRef<Record<string, number>>({});
   const seq = useRef(Date.now());
   const flushing = useRef(false);
   const linesRef = useRef(lines);
@@ -204,7 +203,17 @@ export function CountSheet({ sheet }: { sheet: Sheet }) {
     return () => { cancelled = true; window.removeEventListener('online', on); window.removeEventListener('offline', off); window.clearInterval(t); };
   }, [sessionId, entries, flush]);
 
-  async function persist(e: SheetEntry, fields: Record<string, string>, baseVersion?: number) {
+  // Every change is written to on-device storage IMMEDIATELY (no debounce), so
+  // closing the browser or losing Wi-Fi can never drop a typed count. Only the
+  // network sync is debounced.
+  const flushTimer = useRef<number | undefined>(undefined);
+  const writeChain = useRef<Promise<unknown>>(Promise.resolve());
+  function scheduleFlush(delay = 600) {
+    window.clearTimeout(flushTimer.current);
+    flushTimer.current = window.setTimeout(() => flush(), delay);
+  }
+
+  async function persist(e: SheetEntry, fields: Record<string, string>, baseVersion?: number, flushNow = false) {
     const comps = componentsFrom(fields);
     if (comps === 'invalid') {
       setLines((p) => ({ ...p, [e.id]: { ...p[e.id], status: 'error', message: 'Quantities must be numbers between 0 and 100,000.' } }));
@@ -218,15 +227,20 @@ export function CountSheet({ sheet }: { sheet: Sheet }) {
       mutation_id: newKey(), session_id: sessionId, entry_id: e.id, components: comps,
       base_version: baseVersion ?? linesRef.current[e.id].version, recorded_at: new Date().toISOString(), seq: ++seq.current,
     };
+    // Device writes are chained so they land in the exact order they were typed.
+    const write = writeChain.current.then(() => enqueue(m));
+    writeChain.current = write.catch(() => undefined);
     try {
-      await enqueue(m);
+      await write;
     } catch {
       setNoStorage(true);
       return;
     }
     await refreshQueued();
-    flush();
+    if (flushNow) flush(); else scheduleFlush();
   }
+  /** Resolves when every typed value is stored on the device. */
+  const deviceWritesDone = () => writeChain.current;
 
   function onField(unit: string, value: string) {
     if (!entry || locked) return;
@@ -234,14 +248,11 @@ export function CountSheet({ sheet }: { sheet: Sheet }) {
     const fields = { ...linesRef.current[e.id].fields, [unit]: value };
     linesRef.current = { ...linesRef.current, [e.id]: { ...linesRef.current[e.id], fields } };
     setLines((p) => ({ ...p, [e.id]: { ...p[e.id], fields, status: 'pending', message: undefined, conflict: undefined } }));
-    window.clearTimeout(timers.current[e.id]);
-    timers.current[e.id] = window.setTimeout(() => persist(e, fields), 600);
+    persist(e, fields);
   }
 
   function saveNow() {
-    if (!entry) return;
-    const t = timers.current[entry.id];
-    if (t) { window.clearTimeout(t); delete timers.current[entry.id]; persist(entry, linesRef.current[entry.id].fields); }
+    scheduleFlush(0);
   }
   function go(delta: number) {
     saveNow();
@@ -255,14 +266,19 @@ export function CountSheet({ sheet }: { sheet: Sheet }) {
   const allDone = entries.filter(isCounted).length;
   const areas = [...new Set(entries.map((e) => e.storage_name))];
 
+  // SAVED only when nothing is waiting: no unsynced device copy and no line mid-save.
+  const anyPending = Object.values(lines).some((l) => l.status === 'pending');
+  const anyError = Object.values(lines).some((l) => l.status === 'error');
+  const busy = syncing || queued > 0 || anyPending;
   const statusLabel = noStorage ? 'THIS BROWSER CANNOT SAVE OFFLINE — STAY CONNECTED'
     : syncError ? syncError
     : !online ? `OFFLINE — SAVED ON DEVICE${queued ? ` (${queued} to sync)` : ''}`
-    : syncing || queued > 0 ? 'SYNCING…' : 'SAVED';
-  const statusTone = noStorage || syncError ? 'bg-red-700 text-white' : !online ? 'bg-slate-800 text-white' : syncing || queued > 0 ? 'bg-amber-400 text-slate-900' : 'bg-emerald-700 text-white';
+    : busy ? 'SYNCING…'
+    : anyError ? 'SYNC ERROR — check lines marked Error' : 'SAVED';
+  const statusTone = noStorage || syncError || (anyError && !busy) ? 'bg-red-700 text-white' : !online ? 'bg-slate-800 text-white' : busy ? 'bg-amber-400 text-slate-900' : 'bg-emerald-700 text-white';
 
   async function finish(asZero: boolean) {
-    saveNow();
+    await deviceWritesDone();
     await flush();
     if ((await queueFor(sessionId).catch(() => [])).length > 0 || !navigator.onLine) {
       setFinishMsg('Some counts are still waiting to sync. Connect to Wi-Fi, wait for SAVED, then finish.');
@@ -324,7 +340,7 @@ export function CountSheet({ sheet }: { sheet: Sheet }) {
                   disabled={!!locked}
                   value={line.fields[u] ?? ''}
                   onChange={(ev) => onField(u, ev.target.value)}
-                  onBlur={saveNow}
+                  onBlur={() => saveNow()}
                   onKeyDown={(ev) => { if (ev.key === 'Enter') { ev.preventDefault(); go(1); } }}
                   autoFocus={i === fieldUnits(entry).length - 1}
                   className="min-h-16 w-full rounded-2xl border-2 border-slate-300 px-4 text-right text-3xl font-bold tabular-nums focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/20"
@@ -346,14 +362,14 @@ export function CountSheet({ sheet }: { sheet: Sheet }) {
               <p>Their count: <strong>{line.conflict.qty === null ? 'blank' : `${formatQty(line.conflict.qty)} ${entry.inventory_unit}`}</strong>{line.conflict.by ? ` (${line.conflict.by})` : ''}. Yours: <strong>{total || 'blank'}</strong>.</p>
               <div className="mt-2 flex gap-2">
                 <Button size="sm" variant="secondary" onClick={() => setLines((p) => ({ ...p, [entry.id]: { fields: fieldsFrom(entry, line.conflict!.components), version: line.conflict!.version, serverQty: line.conflict!.qty, status: 'saved' } }))}>Keep theirs</Button>
-                <Button size="sm" onClick={() => { const v = line.conflict!.version; setLines((p) => ({ ...p, [entry.id]: { ...p[entry.id], version: v, status: 'pending', conflict: undefined } })); persist(entry, line.fields, v); }}>Use my count</Button>
+                <Button size="sm" onClick={() => { const v = line.conflict!.version; setLines((p) => ({ ...p, [entry.id]: { ...p[entry.id], version: v, status: 'pending', conflict: undefined } })); persist(entry, line.fields, v, true); }}>Use my count</Button>
               </div>
             </Alert>
           )}
 
           <div className="mt-6 grid grid-cols-3 gap-2">
             <Button size="xl" variant="secondary" onClick={() => go(-1)} disabled={index === 0}>PREVIOUS</Button>
-            <Button size="xl" variant="secondary" onClick={() => { saveNow(); flush(); }}>SAVE</Button>
+            <Button size="xl" variant="secondary" onClick={async () => { await deviceWritesDone(); flush(); }}>SAVE</Button>
             <Button size="xl" onClick={() => go(1)} disabled={index === entries.length - 1}>NEXT</Button>
           </div>
           <p className="mt-2 text-center text-xs text-slate-500">Line {index + 1} of {entries.length} · {entry.item_code}</p>
@@ -382,7 +398,7 @@ export function CountSheet({ sheet }: { sheet: Sheet }) {
           ) : <Button variant="secondary" className="w-full" onClick={() => setAdding(true)} disabled={!online}>+ Item not on the sheet</Button>}
           {finishMsg && <Alert tone="warn">{finishMsg}</Alert>}
           <Button size="lg" variant="secondary" className="w-full" disabled={pending} onClick={async () => {
-            saveNow(); await flush();
+            await deviceWritesDone(); await flush();
             start(async () => { const r = await pauseCount(sessionId); if (!r.ok) setFinishMsg(toMsg(r.error)); else router.push('/counts'); });
           }}>PAUSE COUNT</Button>
           <Button size="lg" className="w-full" disabled={pending || !!locked} onClick={() => finish(false)}>{pending ? 'Working…' : 'FINISH & REVIEW'}</Button>
