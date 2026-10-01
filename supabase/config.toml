@@ -1,0 +1,26 @@
+# Supabase CLI project configuration (used by `supabase link` / `supabase db push`).
+# Hosted projects: mirror the [auth] settings below in the Supabase dashboard
+# (Authentication → Providers / Sign In and Sessions). See docs/DEPLOYMENT.md.
+project_id = "restaurant-inventory"
+
+[api]
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+major_version = 15
+
+[auth]
+site_url = "http://localhost:3000"
+# CRITICAL: nobody may self-register. Accounts are created by the owner only.
+enable_signup = false
+minimum_password_length = 12
+jwt_expiry = 3600
+
+[auth.email]
+enable_signup = false
+enable_confirmations = false
+
+[storage]
+file_size_limit = "15MiB"

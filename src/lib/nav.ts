@@ -11,6 +11,7 @@ export interface NavItem {
 /** Desktop sidebar (management/owner). Only modules that exist are listed. */
 export const SIDEBAR: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', any: [] },
+  { href: '/search', label: 'Search', any: [], managementOnly: true },
   { href: '/inventory', label: 'Inventory', any: ['inventory.view'] },
   { href: '/counts', label: 'Counts', any: ['counts.perform', 'counts.post'] },
   { href: '/receiving', label: 'Receiving', any: ['receiving.review'] },

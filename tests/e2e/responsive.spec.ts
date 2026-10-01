@@ -7,7 +7,7 @@ test.beforeAll(() => resetDemo());
 
 const MANAGEMENT_PAGES = ['/dashboard', '/inventory', '/counts', '/receiving', '/receiving/new', '/ordering', '/vendors', '/waste', '/transfers',
   '/tasks', '/alerts', '/employees', '/reports', '/reports/waste', '/reports/deliveries', '/reports/price-history', '/reports/inventory-value',
-  '/reports/variance', '/reports/employee-activity', '/more'];
+  '/reports/variance', '/reports/employee-activity', '/more', '/search?q=chick'];
 const OWNER_ONLY = ['/admin', '/admin/settings', '/admin/accounts', '/admin/storage', '/admin/count-order', '/admin/catalog', '/admin/audit'];
 
 async function visitAll(page: import('@playwright/test').Page, paths: string[], shotPrefix: string, project: string) {
@@ -15,6 +15,9 @@ async function visitAll(page: import('@playwright/test').Page, paths: string[], 
     const res = await page.goto(path);
     expect(res?.status(), path).toBeLessThan(400);
     await expect(page.locator('main')).toBeVisible();
+    // wait for streamed content: no loading skeleton left
+    await expect(page.locator('[aria-busy="true"]')).toHaveCount(0, { timeout: 20_000 });
+    await page.waitForLoadState('networkidle');
     await expect(page.getByText('This page could not load')).toHaveCount(0);
     await expectNoHorizontalOverflow(page);
     await page.screenshot({ path: `test-results/screens/${project}/${shotPrefix}${path.replace(/\//g, '_') || '_root'}.png`, fullPage: true });
