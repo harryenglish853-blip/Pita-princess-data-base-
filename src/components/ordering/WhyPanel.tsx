@@ -32,7 +32,7 @@ export function WhyPanel({ s }: { s: SuggestionLine }) {
   return (
     <details className="group rounded-lg bg-slate-50 px-3 py-2 text-sm">
       <summary className="cursor-pointer select-none font-bold text-brand">WHY? <span className="font-normal text-slate-600">{why}</span></summary>
-      <dl className="mt-2 grid grid-cols-[1fr_auto] gap-x-4 gap-y-1">
+      <dl className="mt-2 grid grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-x-4 gap-y-1">
         {rows.map(([k, v]) => (
           <div key={k} className="contents"><dt className="text-slate-600">{k}</dt><dd className="text-right tabular-nums">{v}</dd></div>
         ))}
