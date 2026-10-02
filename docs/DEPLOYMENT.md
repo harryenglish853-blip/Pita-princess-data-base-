@@ -60,8 +60,10 @@ unless explicitly overridden for staging, and always refuses when `APP_ENV=produ
    `APP_URL`, `APP_ENV` (`staging` / `production`).
 3. Email reports: create a Resend account, verify the restaurant's sending domain, then set
    `RESEND_API_KEY`, `EMAIL_FROM` and `CRON_SECRET` (random, 32+ characters). `vercel.json`
-   runs `/api/cron/reports` every hour (hourly crons need a Vercel Pro plan; on Hobby, change
-   the schedule to once a day after the report hour). The owner enters the company and manager
+   runs `/api/cron/reports` every hour (daily, weekly on the chosen weekday, monthly on the chosen
+   day) and `/api/cron/alerts` every 10 minutes as a safety net for immediate alerts (these crons
+   need a Vercel Pro plan; on Hobby, run reports once a day after the report hour — immediate
+   alerts are still sent right after each action). The owner enters the company and manager
    email addresses in **Administration → Email reports** and can preview or send a report there.
 4. Toast POS: ask Toast for API access for the restaurant (a Standard API machine client) and
    set `TOAST_API_URL`, `TOAST_CLIENT_ID`, `TOAST_CLIENT_SECRET`, `TOAST_RESTAURANT_GUID`. In Toast,

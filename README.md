@@ -62,11 +62,18 @@ Carlos and Maria share one login.
 
 - **Invoice photos are required** for every delivery (by hand or against a logged order); several
   pages per invoice; a delivery saved without one shows as "invoice photo missing" until fixed
-- **Email reports**: daily (previous day) and weekly (previous Sunday–Saturday) "everything" reports
-  to the company and manager emails the owner enters — deliveries, who received them, discrepancies,
-  credit due, **invoice photos attached**, orders logged, waste, low stock, price changes, counts,
-  employee activity, open alerts. Preview / send now / history in Administration → Email reports.
-
+- **Email reports** (owner chooses who gets what, per recipient): **daily** (previous day: sales,
+  estimated food cost, deliveries with who received them, discrepancies, credit due, **invoice
+  photos attached**, orders, waste, low stock, price changes, counts, employee activity, open
+  alerts), **weekly** (adds actual vs theoretical food cost, beginning/ending inventory, top loss,
+  vendor spending, inventory completion) and the **monthly owner report** (sales, purchases, food
+  cost, AvT, waste %, inventory variance, vendor spending and price trends, top loss products,
+  best/worst weeks, inventory turnover, month-over-month). Preview / send now / history in
+  Administration → Email reports.
+- **Immediate alert emails** by category (high waste, inventory variance, delivery discrepancies,
+  major price increases, critical / low stock, inventory due, vendor order reminders, failed Toast
+  sync, PIN security): sent right after the event (plus a 10-minute safety-net job), only when
+  thresholds are met, each event at most once per person, grouped, with a per-person cooldown.
 - **Recipes & food cost**: menu items and prep recipes with nested sub-recipes (e.g. House Sauce in
   several sandwiches; loops are rejected). Cost per portion, food cost % and margin are calculated
   live from current ingredient costs, so a price change flows through every recipe that uses it.
@@ -89,7 +96,7 @@ Carlos and Maria share one login.
   (BLOCKED — REQUIRES EXTERNAL CONFIGURATION until set); a local mock Toast API is used for tests.
   A day with Toast sales cannot also be entered by hand.
 
-Not built yet (clearly labeled in the app): immediate alert emails and the monthly owner report (rest of Phase 7), forecasting / barcode camera / voice / OCR (Phase 8).
+Not built yet (clearly labeled in the app): forecasting / barcode camera / voice / OCR (Phase 8).
 
 ## Technology
 

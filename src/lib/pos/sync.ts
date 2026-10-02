@@ -21,6 +21,12 @@ async function startRun(kind: 'menu' | 'orders' | 'webhook', trigger: Trigger, b
 
 async function finish(db: ReturnType<typeof createStorageAdmin>, id: string, status: string, stats: Record<string, unknown>, errors: string[]) {
   await db.from('pos_sync_runs').update({ status, stats, errors: errors.slice(0, 50), finished_at: new Date().toISOString() }).eq('id', id);
+  if (status === 'failed' || status === 'partial') {
+    // management alert (one open at a time); emailed to whoever chose "Failed Toast sync"
+    await db.from('alerts').insert({ alert_type: 'POS_SYNC_FAILED', severity: status === 'failed' ? 'critical' : 'warning',
+      title: `Toast sync ${status === 'failed' ? 'failed' : 'partly failed'}`, message: errors.slice(0, 3).join(' · ').slice(0, 900) || 'See the Toast POS sync log.',
+      link_path: '/pos', dedupe_key: 'pos-sync-failed', entity_type: 'pos_sync_runs', entity_id: id });
+  }
 }
 
 async function enabled(db: ReturnType<typeof createStorageAdmin>) {

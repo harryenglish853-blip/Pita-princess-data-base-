@@ -2,11 +2,10 @@
 
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { receiveCommissaryOrder } from '../../actions';
 import { useActionError } from '@/components/forms/useActionError';
 import { QtyInput, parseQty } from '@/components/forms/QtyInput';
-import { Alert, Button, Card, Field } from '@/components/ui';
+import { Alert, Button, Card, EmptyState, Field, LinkButton } from '@/components/ui';
 import { fmtDate, fmtQty } from '@/lib/format';
 
 export interface IncomingOrder {
@@ -14,29 +13,38 @@ export interface IncomingOrder {
   items: { id: string; name: string; unit_code: string; quantity: number; sent_quantity: number | null }[];
 }
 
-export function ReceiveCommissary({ order, actor }: { order: IncomingOrder; actor: string }) {
+export function ReceiveCommissary({ order: loaded, actor }: { order: IncomingOrder | null; actor: string }) {
+  // Keep the order as it was when the screen opened: after receiving, the server no longer lists it,
+  // and the result must stay on screen.
+  const [order] = useState(loaded);
   const toMsg = useActionError();
-  const router = useRouter();
   const [got, setGot] = useState<Record<string, string>>({});
   const [err, setErr] = useState<string | null>(null);
   const [done, setDone] = useState<string[] | null>(null);
   const [pending, start] = useTransition();
   const expected = (i: IncomingOrder['items'][number]) => Number(i.sent_quantity ?? i.quantity);
 
+  if (!order) {
+    return <EmptyState title="This commissary order is not on its way" action={<LinkButton href="/dashboard">Home</LinkButton>}>
+      It may already be received, or the commissary has not marked it ready / sent yet.
+    </EmptyState>;
+  }
+
+  const o = order;
   function submit() {
     const lines: { item_id: string; quantity: number }[] = [];
-    for (const i of order.items) {
+    for (const i of o.items) {
       const q = parseQty(got[i.id] ?? '');
       if (q === null || Number.isNaN(q) || q < 0) return setErr(`${i.name}: enter how much arrived (0 if none).`);
       lines.push({ item_id: i.id, quantity: q });
     }
     setErr(null);
     start(async () => {
-      const r = await receiveCommissaryOrder(order.id, lines).catch(() => null);
+      const r = await receiveCommissaryOrder(o.id, lines).catch(() => null);
       if (!r) return setErr('Could not reach the server. Nothing was saved — try again.');
       if (!r.ok) return setErr(toMsg(r.error));
+      // Show the result here. (No refresh: this page would then say the order is no longer on its way.)
       setDone(r.data.differences ?? []);
-      router.refresh();
     });
   }
 

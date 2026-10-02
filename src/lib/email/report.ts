@@ -30,6 +30,12 @@ interface Delivery {
   invoice_documents: { file_name: string; mime_type: string; storage_bucket: string; storage_path: string; size_bytes: number; upload_status: string }[];
 }
 
+interface FoodCost {
+  sales: number; beginning_inventory: number; purchases: number; ending_inventory: number; actual_cost: number; theoretical_cost: number; variance: number;
+  actual_pct: number | null; theoretical_pct: number | null; variance_pts: number | null; counts: { name: string }[];
+  products: { name: string; variance_value: number; actual_value: number; theoretical_value: number; waste_value: number }[];
+}
+
 export async function buildReport(db: SupabaseClient, type: ReportType, from: string, to: string, tz: string, appUrl: string): Promise<BuiltReport> {
   const { start, end } = instantRange(from, to, tz);
   const [org, locs] = await Promise.all([
@@ -39,7 +45,8 @@ export async function buildReport(db: SupabaseClient, type: ReportType, from: st
   const restaurant = org[0]?.name ?? 'Restaurant';
   const main = locs.find((l) => l.location_type === 'restaurant');
 
-  const [deliveries, waste, stock, prices, counts, activity, alerts, orders, transfers] = await Promise.all([
+  const [fc, deliveries, waste, stock, prices, counts, activity, alerts, orders, transfers] = await Promise.all([
+    q<FoodCost>(db.rpc('food_cost_report_service', { p_from: from, p_to: to })),
     q<Delivery[]>(db.from('receiving_events').select(`id, receipt_number, invoice_number, delivery_date, received_at, received_total, invoiced_total, credit_due_estimate, status,
         vendors(name), employees(display_name), account:account_profiles!receiving_events_account_id_fkey(display_name),
         delivery_discrepancies(discrepancy_type, description, amount_estimate, status),
@@ -130,7 +137,13 @@ export async function buildReport(db: SupabaseClient, type: ReportType, from: st
 <h1 style="margin:4px 0 2px;font-size:22px">${esc(type === 'daily' ? 'Daily Restaurant Operations' : 'Weekly Restaurant Inventory Report')}</h1>
 <p style="margin:0 0 16px;color:#475569">${esc(period)}</p>
 <table role="presentation" style="width:100%;border-collapse:collapse">
-<tr>${stat('Sales', 'Not connected', 'Toast is a later phase')}${stat('Purchases (received)', fmtMoney(purchases.toString()), `${deliveries.length} ${deliveries.length === 1 ? 'delivery' : 'deliveries'}`)}</tr>
+<tr>${stat('Sales', Number(fc.sales) > 0 ? fmtMoney(fc.sales) : 'No sales', 'Toast and entered sales')}${stat('Purchases (received)', fmtMoney(purchases.toString()), `${deliveries.length} ${deliveries.length === 1 ? 'delivery' : 'deliveries'}`)}</tr>
+<tr>${type === 'daily'
+    ? stat('Estimated food cost', fc.theoretical_pct === null ? '—' : fmtPct(fc.theoretical_pct), 'Theoretical: sales × recipe cost') + stat('Theoretical food cost', fmtMoney(fc.theoretical_cost))
+    : stat('Actual food cost', fc.actual_pct === null ? fmtMoney(fc.actual_cost) : `${fmtPct(fc.actual_pct)} · ${fmtMoney(fc.actual_cost)}`, fc.counts.length ? 'Between posted counts' : 'Book inventory (no full count posted)') +
+      stat('Theoretical food cost', fc.theoretical_pct === null ? fmtMoney(fc.theoretical_cost) : `${fmtPct(fc.theoretical_pct)} · ${fmtMoney(fc.theoretical_cost)}`,
+        `Variance ${Number(fc.variance) > 0 ? '+' : ''}${fmtMoney(fc.variance)}${fc.variance_pts === null ? '' : ` (${fc.variance_pts > 0 ? '+' : ''}${fc.variance_pts} pts)`}`)}</tr>
+${type === 'weekly' ? `<tr>${stat('Beginning inventory', fmtMoney(fc.beginning_inventory))}${stat('Ending inventory', fmtMoney(fc.ending_inventory))}</tr>` : ''}
 <tr>${stat('Delivery issues', String(discCount), credit.gt(0) ? `Possible credit due ${fmtMoney(credit.toString())}` : '')}${stat('Invoice photos missing', String(missingPhotos.length))}</tr>
 <tr>${stat('Waste', fmtMoney(wasteTotal.toString()), `${waste.length} ${waste.length === 1 ? 'entry' : 'entries'}`)}${stat('Inventory value now', fmtMoney(invValue.toString()), 'Book quantity × average cost')}</tr>
 <tr>${stat('Low / critical / out of stock', String(lowStock.length))}${stat('Inventory variance (posted counts)', fmtMoney(variance.toString()), `${counts.length} count(s) posted`)}</tr>
@@ -138,6 +151,11 @@ export async function buildReport(db: SupabaseClient, type: ReportType, from: st
 ${section('Needs attention', alerts.length ? `<ul style="padding-left:18px;margin:4px 0">${alerts.map((a) => `<li><b>${esc(a.title)}</b> — ${esc(a.message)}</li>`).join('')}</ul>` : '<p style="color:#64748b">Nothing open.</p>')}
 ${section(`Deliveries & invoices (${deliveries.length})`, table(['Date', 'Vendor / invoice', 'Received by', 'Value', 'Issues', 'Invoice photo', ''], deliveryRows, ['l', 'l', 'l', 'r', 'l', 'l', 'l']) +
   (attachments.length ? `<p style="font-size:12px;color:#475569">Invoice photos are attached to this email (${attachments.length} file${attachments.length === 1 ? '' : 's'}).</p>` : ''))}
+${type === 'weekly' ? section('Top loss (actual − theoretical)', table(['Product', 'Actual', 'Theoretical', 'Waste', 'Loss'],
+    fc.products.filter((x) => Number(x.variance_value) > 0).sort((a, b) => Number(b.variance_value) - Number(a.variance_value)).slice(0, 8)
+      .map((x) => [esc(x.name), esc(fmtMoney(x.actual_value)), esc(fmtMoney(x.theoretical_value)), esc(fmtMoney(x.waste_value)), `<b>${esc(fmtMoney(x.variance_value))}</b>`]), ['l', 'r', 'r', 'r', 'r'])) +
+  section('Inventory completion', counts.length ? `<p style="margin:4px 0">${counts.length} count(s) posted this week. ${link('/counts', 'View counts')}</p>`
+    : `<p style="margin:4px 0;color:#b91c1c"><b>No inventory count was posted this week.</b> ${link('/counts', 'Start weekly inventory')}</p>`) : ''}
 ${type === 'weekly' ? section('Vendor spending', table(['Vendor', 'Received value'], [...byVendor.entries()].sort((a, b) => b[1].cmp(a[1])).map(([v, t]) => [esc(v), esc(fmtMoney(t.toString()))]), ['l', 'r'])) : ''}
 ${section('Orders logged', table(['Order', 'Vendor', 'Status', 'Est. total'], orders.map((o) => [`#${o.po_number}`, esc(o.vendors?.name), esc(humanize(o.status)), esc(fmtMoney(o.estimated_total))]), ['l', 'l', 'l', 'r']))}
 ${section('Waste', table(['Product', 'Cost'], [...wasteByProduct.entries()].sort((a, b) => b[1].cmp(a[1])).slice(0, 10).map(([p, t]) => [esc(p), esc(fmtMoney(t.toString()))]), ['l', 'r']) +
@@ -149,12 +167,12 @@ ${section('Employee activity', table(['Person', 'Receiving', 'Waste', 'Transfers
     const other = [...m.entries()].filter(([k]) => !['receiving', 'waste', 'transfer', 'counts'].includes(k)).reduce((a, [, n]) => a + n, 0);
     return [esc(who), String(m.get('receiving') ?? 0), String(m.get('waste') ?? 0), String(m.get('transfer') ?? 0), String(m.get('counts') ?? 0), String(other)];
   }), ['l', 'r', 'r', 'r', 'r', 'r']))}
-<p style="font-size:13px;color:#475569">Transfers: ${transfers.length}. Food cost % needs Toast sales and recipes (later phase).</p>
+<p style="font-size:13px;color:#475569">Transfers: ${transfers.length}. ${link('/reports/food-cost', 'Actual vs theoretical food cost')}</p>
 <p style="margin:24px 0"><a href="${esc(appUrl + '/dashboard')}" style="background:#0f766e;color:#ffffff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:700">VIEW DASHBOARD</a></p>
 <p style="font-size:11px;color:#94a3b8">Private report for ${esc(restaurant)}. Links require signing in. Generated from recorded data.</p>
 </div></body></html>`;
 
-  const text = `${subject}\nPurchases ${fmtMoney(purchases.toString())} (${deliveries.length} deliveries), delivery issues ${discCount}, invoice photos missing ${missingPhotos.length}, waste ${fmtMoney(wasteTotal.toString())}, low stock ${lowStock.length}.\nView: ${appUrl}/dashboard`;
+  const text = `${subject}\nSales ${fmtMoney(fc.sales)}, food cost ${fc.theoretical_pct === null ? '—' : `${fc.theoretical_pct}% theoretical`}. Purchases ${fmtMoney(purchases.toString())} (${deliveries.length} deliveries), delivery issues ${discCount}, invoice photos missing ${missingPhotos.length}, waste ${fmtMoney(wasteTotal.toString())}, low stock ${lowStock.length}.\nView: ${appUrl}/dashboard`;
   return { subject, html, attachments, text };
 }
 

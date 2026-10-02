@@ -1,10 +1,10 @@
 # Launch readiness report
 
-**Date:** 2026-10-01 · **Scope reviewed:** Phase 1 (foundation) + Phase 2 (core restaurant operations) + Phase 3 (suggested ordering) + Phase 4 (commissary) + Phase 5 (recipes & food cost) + Phase 6 (Toast)
+**Date:** 2026-10-01 · **Scope reviewed:** Phase 1 (foundation) + Phase 2 (core restaurant operations) + Phase 3 (suggested ordering) + Phase 4 (commissary) + Phase 5 (recipes & food cost) + Phase 6 (Toast) + Phase 7 (email reporting)
 
 ## Final recommendation: **NOT READY FOR PRODUCTION**
 
-Phases 1–6 are built and pass every automated test listed below. The system must still
+Phases 1–7 are built and pass every automated test listed below. The system must still
 **not** be used for real restaurant operations, because:
 
 1. It has only ever run against a **local** Supabase-equivalent stack (same Docker images
@@ -12,19 +12,19 @@ Phases 1–6 are built and pass every automated test listed below. The system mu
    **BLOCKED — REQUIRES EXTERNAL CONFIGURATION** (Supabase + Vercel accounts, domain).
 2. The owner acceptance checklist (real products, units, case sizes, costs, pars, vendors,
    URLs, employees, count order) has not been done.
-3. Phases 7–8 (immediate alert emails/monthly report, OCR/barcode/voice) are not built.
+3. Phase 8 (advanced forecasting, OCR, barcode camera, voice counts, anomaly detection) is not built.
 4. The Toast integration has only run against a local mock of the Toast API. It is
    **NOT YET VERIFIED** against a real Toast account (credentials, exact field names, webhook
    signature format, rate limits) — **BLOCKED — REQUIRES EXTERNAL CONFIGURATION** (Toast API
    access for the restaurant).
 5. Backups/PITR and a restore drill can only be done on a real Supabase project.
 
-## Features completed (Phases 1–6)
+## Features completed (Phases 1–7)
 
 | Area | Status |
 |---|---|
 | Next.js 16 app, Tailwind, PWA manifest + service worker | Done |
-| Supabase schema: 16 migrations, RLS on every table, no `anon` access | Done |
+| Supabase schema: 17 migrations, RLS on every table, no `anon` access | Done |
 | 4 login roles; ONE shared employee login; employee profiles; hashed PINs; lockout; session switching; inactivity lock | Done |
 | Employee attribution on every operational record + audit log (login account AND employee) | Done |
 | Products, categories, storage areas, units, central conversion engine, vendors, vendor links | Done |
@@ -43,12 +43,13 @@ Phases 1–6 are built and pass every automated test listed below. The system mu
 | Sales layer (source-agnostic; manual daily entry now): one row per (source, external id), theoretical usage posted to the ledger through the recipes, repeated / changed / voided lines never double count, unmapped lines post nothing | Done (Toast import = Phase 6) |
 | Actual vs theoretical food cost report (owners): $ and %, variance $ and pts, formula shown, drilldown by category / product / menu item / day, CSV; owner dashboard sales + food cost tiles; waste % of sales | Done |
 | Toast POS: adapter (Toast → neutral orders), menu import, sales import (hourly cron + manual), signed webhook (HMAC, event dedupe), menu mapping with UNMAPPED items and AUTO-MATCH, re-posting earlier sales on mapping, sync log with errors; created / updated / duplicate / stale / voided / refunded / removed-item / quantity-change orders never double count; manual entry blocked on Toast days | Done against a mock Toast API — NOT YET VERIFIED with a real Toast account |
+| Email: per-recipient preferences (daily / weekly / monthly / commissary / alert categories), daily + weekly with sales and food cost, monthly owner report (MoM, best/worst weeks, turnover, price trends, top loss), immediate alert emails (thresholds, once per event per person, grouped, cooldown, claim-before-send so concurrent runs never double send), sent right after the action + 10-minute cron | Done (delivery via Resend: BLOCKED — REQUIRES EXTERNAL CONFIGURATION) |
 | Required invoice photo on every delivery (multi-page, direct upload to private storage, retry, "photo missing" alert until attached) | Done |
 | Daily + weekly email reports with invoice photos attached; owner-managed recipients; preview, send now, history; hourly scheduler sends each period once | Done (delivery via Resend: BLOCKED — REQUIRES EXTERNAL CONFIGURATION) |
 
 ## Features intentionally deferred (clearly labeled in the app; no fake buttons)
 
-Phase 7 immediate alert emails and monthly owner report · Phase 8
+Phase 8
 advanced forecasting (seasonality, Toast sales, events), OCR, camera barcode scanning, voice counts. Sales come only from entered
 sales; with none, the tiles say so rather than showing invented numbers. Actual food cost uses
 book inventory unless full counts are posted at the start and end of the period (the report says
@@ -62,7 +63,7 @@ browser's Print → Save as PDF.
 | Lint (ESLint, Next rules) + TypeScript strict typecheck | Pass, 0 warnings |
 | Production build (`next build`) | Pass (44 routes) |
 | Unit tests (conversion engine vs shared fixtures, CSV escaping/formula injection, time-zone ranges incl. DST, vendor delivery/cutoff, order list text) | 41 / 41 pass (incl. order cutoff time, Toast order/menu normalizer) |
-| Database / integration tests against real Postgres 15 + Supabase roles (RLS, PIN security, attribution, ledger immutability, receiving/waste/transfer/count math, conversions in SQL, admin, vendor order log, invoice-photo alerts, email report content/attachments/recipients/duplicate-send, mock email provider) | 96 / 96 pass (incl. Toast: created, duplicate, update (3 burgers = 1.5 LB, not 2.5), removed item, stale version, refund, void, late mapping posts once, not tracked, service-key only, sync off, manual entry blocked; also food cost: cheeseburger cost line by line = $3.5953 / 27.7%, a price change flowing through House Sauce into every sandwich, cycle rejection, 120 cheeseburgers × 8 OZ = 60 LB beef, repeat / change / void without double counting, unmapped items, actual = beginning + purchases − ending, permissions; also commissary: status flow, 95-of-100 receipt out 95 / in 95 with alert, production cost $29.25 / 20 QT = $1.4625, immutability, idempotency, permissions; also hand-verified suggested-order math: need 62 + 15 = 77, have 27 + 10 = 37, short 40 → 1 case of 40; par rounding; forged suggestion ignored; overrides audited; employees refused) |
+| Database / integration tests against real Postgres 15 + Supabase roles (RLS, PIN security, attribution, ledger immutability, receiving/waste/transfer/count math, conversions in SQL, admin, vendor order log, invoice-photo alerts, email report content/attachments/recipients/duplicate-send, mock email provider) | 107 / 107 pass (incl. alert emails: only chosen categories, nothing from before a recipient existed, thresholds (small waste and minor price rises not emailed), stock announced once per drop, three concurrent dispatchers send once, cooldown groups alerts; daily/monthly report content; monthly recipients; server-only food cost; also Toast: created, duplicate, update (3 burgers = 1.5 LB, not 2.5), removed item, stale version, refund, void, late mapping posts once, not tracked, service-key only, sync off, manual entry blocked; also food cost: cheeseburger cost line by line = $3.5953 / 27.7%, a price change flowing through House Sauce into every sandwich, cycle rejection, 120 cheeseburgers × 8 OZ = 60 LB beef, repeat / change / void without double counting, unmapped items, actual = beginning + purchases − ending, permissions; also commissary: status flow, 95-of-100 receipt out 95 / in 95 with alert, production cost $29.25 / 20 QT = $1.4625, immutability, idempotency, permissions; also hand-verified suggested-order math: need 62 + 15 = 77, have 27 + 10 = 37, short 40 → 1 case of 40; par rounding; forged suggestion ignored; overrides audited; employees refused) |
 | Browser E2E — full demo flow, phone size (steps 1–25 and 28 below) | 9 / 9 pass |
 | Browser E2E — log a Sysco order (copy list, open website link, log as placed) then employee receives against it with an invoice photo; VIEW SUGGESTED ORDER prefill, WHY?, override, both numbers stored | 3 / 3 pass |
 | Browser E2E — commissary: create + submit (email logged to the commissary recipient with VIEW ORDER), accept / prepare / ready / send, Carlos receives 95 of 100 on the shared login, differences shown, production batch pre-fill and cost | 4 / 4 pass |
@@ -88,6 +89,8 @@ last-owner removal, self-demotion, privilege escalation attempts by management.
 
 | Severity | Bug | Fix |
 |---|---|---|
+| MEDIUM | After receiving a commissary order the result could vanish (the page re-rendered and said the order was no longer on its way) — intermittent | Receive screen keeps the order it opened with and its result |
+| MEDIUM | A product's stock alert could be emailed again on the next run (timestamp text format changed after the round trip) | Event key uses the numeric time |
 | HIGH (security) | Employee could complete a management-only task (`NOT (NULL OR …)` evaluated NULL) | NULL-safe check + test |
 | HIGH (data) | Missing `lines`/`items`/`components` or NULL flag could pass validation (count could be saved as 0) | NULL-safe validation + tests |
 | HIGH (data loss) | Count screen showed SAVED while the last typed value was still in a 600 ms debounce, not yet on the device | Every keystroke written to IndexedDB immediately (serialized); SAVED only when nothing pending; E2E reload-while-offline test |

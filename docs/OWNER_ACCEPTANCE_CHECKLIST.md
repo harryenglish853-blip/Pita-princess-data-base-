@@ -59,8 +59,11 @@ Initial each line, with the date.
       TOAST_* variables in Vercel, turn on Toast sync, SYNC MENU, map every item (or mark it not
       tracked), SYNC SALES for yesterday and compare totals with Toast's sales summary
 
+- [ ] Email: for each person choose daily / weekly / monthly and their immediate alert types; send
+      the monthly report now and read it on a phone; log a large waste entry and confirm the alert email
+      arrives once
+
 ## Not yet available (do not plan operations around these)
-- [ ] Understood:
-      immediate alert emails, monthly report, advanced forecasting, barcode camera and voice counts are later phases
+- [ ] Understood: advanced forecasting, invoice OCR, barcode camera and voice counts are a later phase (8)
 
 Signed (Owner #1): ____________  Date: ______   Signed (Owner #2): ____________  Date: ______

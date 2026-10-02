@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation';
 import { addRecipient, updateRecipient, removeRecipient, sendReportNow } from './actions';
 import { useActionError } from '@/components/forms/useActionError';
 import { Alert, Button, Card, CardTitle, Input } from '@/components/ui';
+import { ALERT_CATEGORIES, type AlertCategory } from '@/lib/email/alertCategories';
 
-interface R { id: string; email: string; name: string | null; receives_daily: boolean; receives_weekly: boolean; receives_commissary_orders: boolean; is_active: boolean }
+interface R { id: string; email: string; name: string | null; receives_daily: boolean; receives_weekly: boolean; receives_monthly: boolean; receives_commissary_orders: boolean; alert_types: AlertCategory[]; is_active: boolean }
 
 export function RecipientsEditor({ recipients }: { recipients: R[] }) {
   const toMsg = useActionError();
@@ -23,15 +24,29 @@ export function RecipientsEditor({ recipients }: { recipients: R[] }) {
       {recipients.length === 0 && <p className="font-semibold text-amber-800">No recipients yet — reports are saved but go to nobody.</p>}
       <ul className="space-y-2">
         {recipients.map((r) => (
-          <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 p-2">
+          <li key={r.id} className="space-y-2 rounded-xl border border-slate-200 p-2">
+           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className={r.is_active ? '' : 'text-slate-400 line-through'}><b>{r.email}</b>{r.name && ` · ${r.name}`}</span>
             <span className="flex flex-wrap items-center gap-3 text-sm">
               <label className="flex items-center gap-1"><input type="checkbox" checked={r.receives_daily} disabled={pending} onChange={(e) => act(() => updateRecipient(r.id, { receives_daily: e.target.checked }) as never)} />Daily</label>
               <label className="flex items-center gap-1"><input type="checkbox" checked={r.receives_weekly} disabled={pending} onChange={(e) => act(() => updateRecipient(r.id, { receives_weekly: e.target.checked }) as never)} />Weekly</label>
+              <label className="flex items-center gap-1"><input type="checkbox" checked={r.receives_monthly} disabled={pending} onChange={(e) => act(() => updateRecipient(r.id, { receives_monthly: e.target.checked }) as never)} />Monthly</label>
               <label className="flex items-center gap-1"><input type="checkbox" checked={r.receives_commissary_orders} disabled={pending} onChange={(e) => act(() => updateRecipient(r.id, { receives_commissary_orders: e.target.checked }) as never)} />Commissary orders</label>
               <Button size="sm" variant="ghost" disabled={pending} onClick={() => act(() => updateRecipient(r.id, { is_active: !r.is_active }) as never)}>{r.is_active ? 'Pause' : 'Resume'}</Button>
               <Button size="sm" variant="ghost" disabled={pending} onClick={() => window.confirm(`Remove ${r.email}?`) && act(() => removeRecipient(r.id) as never)}>Remove</Button>
             </span>
+           </div>
+            <details>
+              <summary className="cursor-pointer text-sm font-semibold text-brand">Immediate alerts: {r.alert_types.length === 0 ? 'none' : r.alert_types.map((t) => ALERT_CATEGORIES[t]).join(', ')}</summary>
+              <fieldset className="mt-2 grid gap-1 text-sm sm:grid-cols-2">
+                <legend className="sr-only">Immediate alerts for {r.email}</legend>
+                {(Object.keys(ALERT_CATEGORIES) as AlertCategory[]).map((k) => (
+                  <label key={k} className="flex items-center gap-2"><input type="checkbox" checked={r.alert_types.includes(k)} disabled={pending}
+                    aria-label={`${r.email} ${ALERT_CATEGORIES[k]}`}
+                    onChange={(e) => act(() => updateRecipient(r.id, { alert_types: e.target.checked ? [...r.alert_types, k] : r.alert_types.filter((x) => x !== k) }) as never)} />{ALERT_CATEGORIES[k]}</label>
+                ))}
+              </fieldset>
+            </details>
           </li>
         ))}
       </ul>
@@ -45,7 +60,7 @@ export function RecipientsEditor({ recipients }: { recipients: R[] }) {
   );
 }
 
-export function SendNow({ type, current = false }: { type: 'daily' | 'weekly'; current?: boolean }) {
+export function SendNow({ type, current = false }: { type: 'daily' | 'weekly' | 'monthly'; current?: boolean }) {
   const toMsg = useActionError();
   const router = useRouter();
   const [msg, setMsg] = useState<string | null>(null);
@@ -58,7 +73,7 @@ export function SendNow({ type, current = false }: { type: 'daily' | 'weekly'; c
         const label = { sent: 'Sent', not_configured: 'Saved (email sending not set up yet)', no_recipients: 'Saved (no recipients yet)', failed: 'Failed — see history', already_sent: 'Already sent' }[r.data.status] ?? r.data.status;
         setMsg(`${label}: ${r.data.subject}${r.data.attachments !== undefined ? ` · ${r.data.attachments} invoice photo(s)` : ''}`);
         router.refresh();
-      })}>{pending ? 'Working…' : current ? `Send ${type === 'daily' ? 'today' : 'this week'} so far` : `Send ${type} report now`}</Button>
+      })}>{pending ? 'Working…' : current ? `Send ${type === 'daily' ? 'today' : type === 'weekly' ? 'this week' : 'this month'} so far` : `Send ${type} report now`}</Button>
       {msg && <p className="mt-1 text-sm" role="status">{msg}</p>}
     </div>
   );

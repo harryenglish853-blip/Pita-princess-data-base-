@@ -1,7 +1,10 @@
 import 'server-only';
 import { createStorageAdmin } from '@/lib/supabase/server';
 import { env } from '@/lib/env';
-import { buildReport, type ReportType } from './report';
+import { buildReport } from './report';
+import { buildMonthlyReport } from './monthly';
+
+export type RunType = 'daily' | 'weekly' | 'monthly';
 import { sendEmail, emailConfigured } from './send';
 
 const MAX_ATTACH_BYTES = 20 * 1024 * 1024; // stays well under provider limits
@@ -11,11 +14,13 @@ const MAX_ATTACH_BYTES = 20 * 1024 * 1024; // stays well under provider limits
  * Scheduled runs are idempotent per period: a unique index prevents a second
  * 'sending'/'sent' row for the same report + period.
  */
-export async function runReport(opts: { type: ReportType; from: string; to: string; tz: string; trigger: 'schedule' | 'manual'; accountId?: string; onlyTo?: string[] }) {
+export async function runReport(opts: { type: RunType; from: string; to: string; tz: string; trigger: 'schedule' | 'manual'; accountId?: string; onlyTo?: string[] }) {
   const admin = createStorageAdmin(); // server-only key; callers have already been authorized
-  const report = await buildReport(admin, opts.type, opts.from, opts.to, opts.tz, env.appUrl);
+  const report = opts.type === 'monthly'
+    ? await buildMonthlyReport(admin, opts.from, opts.to, opts.tz, env.appUrl)
+    : await buildReport(admin, opts.type, opts.from, opts.to, opts.tz, env.appUrl);
 
-  const { data: recips, error: rErr } = await admin.from('email_recipients').select('email').eq('is_active', true).eq(opts.type === 'daily' ? 'receives_daily' : 'receives_weekly', true);
+  const { data: recips, error: rErr } = await admin.from('email_recipients').select('email').eq('is_active', true).eq(opts.type === 'daily' ? 'receives_daily' : opts.type === 'weekly' ? 'receives_weekly' : 'receives_monthly', true);
   if (rErr) throw new Error(rErr.message);
   const to = opts.onlyTo ?? (recips ?? []).map((r) => r.email as string);
 

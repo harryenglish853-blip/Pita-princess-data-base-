@@ -282,8 +282,18 @@ test('27: owner sets the company + manager emails; the weekly report includes th
     await page.getByLabel('Recipient email').fill(email);
     await page.getByLabel('Recipient name').fill(name);
     await page.getByRole('button', { name: 'Add recipient' }).click();
-    await expect(page.getByText(email)).toBeVisible();
+    await expect(page.getByText(email, { exact: true })).toBeVisible();
   }
+  // immediate alerts: the manager gets high waste and delivery discrepancy emails
+  await page.getByText(/^Immediate alerts: none/).last().click();
+  await page.getByLabel('manager@pitaprincess.test High waste').click();
+  await expect(page.getByText('Immediate alerts: High waste')).toBeVisible();
+  await page.getByLabel('manager@pitaprincess.test Delivery discrepancies').click();
+  await expect(page.getByText('Immediate alerts: High waste, Delivery discrepancies')).toBeVisible();
+  const prefs = (await sql<{ alert_types: string[]; receives_monthly: boolean }>(`select alert_types, receives_monthly from email_recipients where email = 'manager@pitaprincess.test'`))[0];
+  expect(prefs).toEqual({ alert_types: ['waste', 'delivery'], receives_monthly: true });
+  await page.goto('/admin/email/preview?type=monthly');
+  await expect(page.getByRole('heading', { name: /^Monthly Owner Report — / })).toBeVisible();
   await page.goto('/admin/email/preview?type=weekly&current=1');
   await expect(page.getByText(/would be attached: .*Sysco-83923-page1\.png/)).toBeVisible();
   await page.goto('/admin/email');
@@ -296,6 +306,7 @@ test('27: owner sets the company + manager emails; the weekly report includes th
   expect(row.html).toContain('Carlos');
   // the scheduler endpoint rejects callers without the secret
   expect((await request.get('/api/cron/reports')).status()).toBe(401);
+  expect((await request.get('/api/cron/alerts')).status()).toBe(401);
   expect((await request.get('/api/cron/reports', { headers: { authorization: 'Bearer wrong-secret-0000000000' } })).status()).toBe(401);
   expect(errors).toEqual([]);
 });
