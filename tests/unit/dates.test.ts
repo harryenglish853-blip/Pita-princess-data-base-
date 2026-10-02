@@ -24,6 +24,9 @@ describe('restaurant-time date ranges', () => {
 describe('next vendor delivery', () => {
   it('Sysco Tue/Fri, 1-day lead: on Thursday Oct 1 the next order is for Friday, cutoff Thursday', () => {
     expect(nextDelivery('2026-10-01', [2, 5], 1, '16:00')).toMatchObject({ date: '2026-10-02', weekday: 'Friday', cutoffDate: '2026-10-01', cutoffWeekday: 'Thursday' });
+    // after Thursday's 4 PM cutoff the Friday delivery is gone; next is Tuesday (cutoff Monday)
+    expect(nextDelivery('2026-10-01', [2, 5], 1, '16:00', '15:59')).toMatchObject({ date: '2026-10-02' });
+    expect(nextDelivery('2026-10-01', [2, 5], 1, '16:00:00', '16:00')).toMatchObject({ date: '2026-10-06', weekday: 'Tuesday', cutoffDate: '2026-10-05' });
   });
   it('skips deliveries whose cutoff already passed', () => {
     // Friday Oct 2: Saturday delivery with 2-day lead had cutoff Thursday -> next is Wednesday (Greco Wed/Sat)

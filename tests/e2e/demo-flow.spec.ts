@@ -242,7 +242,7 @@ test('23-25: ordering center vendor buttons open the vendor websites', async ({ 
   await expect(sysco).toHaveAttribute('target', '_blank');
   await expect(sysco).toHaveAttribute('rel', /noopener/);
   await expect(page.getByRole('link', { name: 'OPEN GRECO WEBSITE' })).toHaveAttribute('href', 'https://www.grecoandsons.com');
-  await expect(page.getByText(/Suggested order quantities arrive in Phase 3/)).toBeVisible();
+  await expect(page.getByRole('link', { name: 'VIEW SUGGESTED ORDER' })).toHaveCount(3); // Sysco, Greco, Commissary
   await expectNoHorizontalOverflow(page);
 });
 

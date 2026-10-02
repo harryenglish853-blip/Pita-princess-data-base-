@@ -44,6 +44,11 @@ Carlos and Maria share one login.
   (opens the vendor's own website), a low-stock list, and LOG AN ORDER: build the list, COPY ORDER
   LIST, place it on the vendor website, then log it here (with the vendor confirmation #).
   Deliveries can be received against a logged order, so short/over shipments are caught.
+- **Suggested orders**: VIEW SUGGESTED ORDER on each vendor card prefills the order with
+  `need − have`, rounded up to whole cases. Need = par level, or (dynamic par with 7+ days of
+  history) average daily usage × days until the following delivery + safety stock. Have = on hand +
+  already ordered + transfers on the way. Every line has a WHY? breakdown; the system suggestion
+  and the manager's quantity are both stored (computed on the server, never trusted from the browser).
 - Employee profile management (add, rename, reset PIN, deactivate — history kept)
 
 - **Invoice photos are required** for every delivery (by hand or against a logged order); several
@@ -53,7 +58,7 @@ Carlos and Maria share one login.
   credit due, **invoice photos attached**, orders logged, waste, low stock, price changes, counts,
   employee activity, open alerts. Preview / send now / history in Administration → Email reports.
 
-Not built yet (clearly labeled in the app): suggested orders (Phase 3), commissary order forms
+Not built yet (clearly labeled in the app): commissary order forms
 & production (Phase 4), recipes and food cost (Phase 5), Toast integration (Phase 6), immediate alert emails and the monthly owner report (rest of Phase 7), forecasting / barcode camera / voice / OCR (Phase 8).
 
 ## Technology

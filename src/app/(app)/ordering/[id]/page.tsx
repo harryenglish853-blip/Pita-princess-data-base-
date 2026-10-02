@@ -10,13 +10,15 @@ import { orderFormData } from '../data';
 import { OrderForm } from '../OrderForm';
 import { CopyList } from '../CopyList';
 import { CancelOrder } from './CancelOrder';
+import { WhyPanel } from '@/components/ordering/WhyPanel';
+import type { SuggestionLine } from '@/lib/suggestions';
 
 export const metadata: Metadata = { title: 'Vendor order' };
 
 interface PO { id: string; po_number: number; vendor_id: string; status: string; expected_delivery_date: string | null; estimated_total: number | null; notes: string | null;
   vendor_confirmation: string | null; placed_at: string | null; created_at: string; cancel_reason: string | null;
   creator: { display_name: string } | null;
-  purchase_order_items: { product_id: string; quantity: number; unit_code: string; unit_price: number | null; products: { name: string } | null }[];
+  purchase_order_items: { product_id: string; quantity: number; unit_code: string; unit_price: number | null; suggested_qty: number | null; suggestion_detail: SuggestionLine | null; products: { name: string } | null }[];
   receiving_events: { id: string; receipt_number: number; invoice_number: string | null; delivery_date: string; has_discrepancies: boolean }[] }
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
@@ -26,19 +28,21 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
   const po = (await query<PO[]>((s) => s.from('purchase_orders').select(`id, po_number, vendor_id, status, expected_delivery_date, estimated_total, notes, vendor_confirmation, placed_at, created_at, cancel_reason,
     creator:account_profiles!purchase_orders_created_by_fkey(display_name),
-    purchase_order_items(product_id, quantity, unit_code, unit_price, products(name)),
+    purchase_order_items(product_id, quantity, unit_code, unit_price, suggested_qty, suggestion_detail, products(name)),
     receiving_events(id, receipt_number, invoice_number, delivery_date, has_discrepancies)`).eq('id', id)))[0];
   if (!po) notFound();
   const { vendor, items, catalog } = await orderFormData(po.vendor_id);
   if (!vendor) notFound();
 
   if (po.status === 'draft') {
-    return <OrderForm vendor={vendor} vendorItems={items} catalog={catalog} today={todayInTz(tz)} initial={{
+    const suggestions = Object.fromEntries(po.purchase_order_items.filter((i) => i.suggestion_detail).map((i) => [i.product_id, i.suggestion_detail!]));
+    return <OrderForm vendor={vendor} vendorItems={items} catalog={catalog} today={todayInTz(tz)} suggestions={suggestions} initial={{
       id: po.id, expected_delivery_date: po.expected_delivery_date ?? '', vendor_confirmation: po.vendor_confirmation ?? '', notes: po.notes ?? '',
       lines: po.purchase_order_items.map((i) => ({ product_id: i.product_id, qty: String(Number(i.quantity)), unit: i.unit_code, price: i.unit_price === null ? '' : String(Number(i.unit_price)) })),
     }} />;
   }
   const sku = new Map(items.map((i) => [i.product_id, i.vendor_sku]));
+  const hasSugg = po.purchase_order_items.some((i) => i.suggested_qty !== null);
   const lines = [...po.purchase_order_items].sort((a, b) => (a.products?.name ?? '').localeCompare(b.products?.name ?? ''));
   const text = orderText(vendor.name, lines.map((l) => ({ name: l.products?.name ?? '?', quantity: l.quantity, unit: l.unit_code, vendor_sku: sku.get(l.product_id) })), { poNumber: po.po_number, delivery: po.expected_delivery_date ? fmtDate(po.expected_delivery_date) : null });
   return (
@@ -52,12 +56,13 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         </>} />
       {po.status === 'cancelled' && <Alert tone="info" title="Cancelled">{po.cancel_reason}</Alert>}
       <Table>
-        <thead><tr><Th>Product</Th><Th>{vendor.name} SKU</Th><Th className="text-right">Quantity</Th><Th className="text-right">Price</Th><Th className="text-right">Line total</Th></tr></thead>
+        <thead><tr><Th>Product</Th><Th>{vendor.name} SKU</Th>{hasSugg && <Th className="text-right">Suggested</Th>}<Th className="text-right">Quantity</Th><Th className="text-right">Price</Th><Th className="text-right">Line total</Th></tr></thead>
         <tbody>{lines.map((l) => (
-          <tr key={l.product_id}><Td className="font-semibold">{l.products?.name}</Td><Td>{sku.get(l.product_id) ?? '—'}</Td>
+          <tr key={l.product_id}><Td className="font-semibold">{l.products?.name}{l.suggestion_detail && <div className="mt-1 max-w-md font-normal"><WhyPanel s={l.suggestion_detail} /></div>}</Td><Td>{sku.get(l.product_id) ?? '—'}</Td>
+            {hasSugg && <Td className="text-right tabular-nums">{l.suggested_qty === null ? '—' : `${fmtQty(l.suggested_qty)} ${l.suggestion_detail?.order_unit ?? ''}`}</Td>}
             <Td className="text-right tabular-nums">{fmtQty(l.quantity)} {l.unit_code}</Td><Td className="text-right tabular-nums">{fmtMoney(l.unit_price)}</Td>
             <Td className="text-right tabular-nums">{l.unit_price === null ? '—' : fmtMoney((Number(l.quantity) * Number(l.unit_price)).toFixed(2))}</Td></tr>))}
-          <tr><Td colSpan={4} className="text-right font-bold">Estimated total</Td><Td className="text-right font-bold tabular-nums">{fmtMoney(po.estimated_total)}</Td></tr>
+          <tr><Td colSpan={hasSugg ? 5 : 4} className="text-right font-bold">Estimated total</Td><Td className="text-right font-bold tabular-nums">{fmtMoney(po.estimated_total)}</Td></tr>
         </tbody>
       </Table>
       {po.notes && <Card><p className="text-sm">Notes: {po.notes}</p></Card>}

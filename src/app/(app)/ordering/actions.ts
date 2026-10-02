@@ -12,6 +12,8 @@ const schema = z.object({
   expected_delivery_date: z.string().regex(/^(\d{4}-\d{2}-\d{2})?$/),
   vendor_confirmation: z.string().trim().max(60),
   notes: z.string().max(1000),
+  // build from the system suggestion: the server computes and stores it (never sent from the browser)
+  use_suggestion: z.boolean().optional(),
   items: z.array(z.object({
     product_id: z.string().uuid(),
     quantity: z.number().finite().gt(0, 'Every line needs a quantity greater than 0.').max(100000),

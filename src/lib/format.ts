@@ -55,6 +55,11 @@ export function todayInTz(tz = DEFAULT_TZ, offsetDays = 0): string {
   return parts; // en-CA formats as YYYY-MM-DD
 }
 
+/** Current local wall-clock time HH:MM (24h) in the organization's timezone. */
+export function nowTimeInTz(tz = DEFAULT_TZ): string {
+  return new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date());
+}
+
 export function humanize(code: string | null | undefined): string {
   if (!code) return '';
   const s = code.replace(/_/g, ' ').toLowerCase();

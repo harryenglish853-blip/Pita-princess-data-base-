@@ -42,8 +42,11 @@ Initial each line, with the date.
 - [ ] Review variances, recount a flagged item, approve, post; on-hand matches the count
 - [ ] Reports and CSV exports open correctly in Excel
 
+- [ ] Suggested orders: for each vendor, open VIEW SUGGESTED ORDER, tap WHY? on several lines and
+      confirm the math matches what you would order (set dynamic par only on items with steady usage)
+
 ## Not yet available (do not plan operations around these)
-- [ ] Understood: suggested orders, commissary order forms, recipes/food cost, Toast sales,
-      automated emails, forecasting, barcode camera and voice counts are later phases
+- [ ] Understood: commissary order forms, recipes/food cost, Toast sales,
+      immediate alert emails, monthly report, advanced forecasting, barcode camera and voice counts are later phases
 
 Signed (Owner #1): ____________  Date: ______   Signed (Owner #2): ____________  Date: ______

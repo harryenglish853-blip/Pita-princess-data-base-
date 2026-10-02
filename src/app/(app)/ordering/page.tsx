@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
 import { requirePermission } from '@/lib/auth/context';
-import { query } from '@/lib/data';
+import { query, rpc } from '@/lib/data';
+import { suggestionSummary, type SuggestedOrder } from '@/lib/suggestions';
 import { nextDelivery, fmtCutoff } from '@/lib/vendors';
-import { fmtDate, fmtDateTime, fmtMoney, fmtQty, todayInTz, DEFAULT_TZ } from '@/lib/format';
+import { fmtDate, fmtDateTime, fmtMoney, fmtQty, todayInTz, nowTimeInTz, DEFAULT_TZ } from '@/lib/format';
 import Link from 'next/link';
 import { Alert, Badge, Card, CardTitle, EmptyState, LinkButton, PageHeader, StockBadge, Table, Td, Th } from '@/components/ui';
 import { CopyList } from './CopyList';
@@ -16,6 +17,7 @@ export default async function OrderingPage() {
   const ctx = await requirePermission('orders.manage');
   const tz = ctx.organization?.timezone ?? DEFAULT_TZ;
   const today = todayInTz(tz);
+  const nowTime = nowTimeInTz(tz);
   const loc = ctx.location?.id ?? '';
   const [vendors, onhand, products, orders] = await Promise.all([
     query<V[]>((s) => s.from('vendors').select('id, name, code, vendor_type, ordering_url, delivery_days, order_cutoff_time, lead_time_days').eq('is_active', true).order('name')),
@@ -25,17 +27,19 @@ export default async function OrderingPage() {
       s.from('purchase_orders').select('id, po_number, status, expected_delivery_date, estimated_total, placed_at, created_at, vendors(name), purchase_order_items(product_id)').order('created_at', { ascending: false }).limit(30)),
   ]);
   const vendorOf = new Map(products.map((p) => [p.id, p.primary_vendor_id]));
+  const suggested = new Map((await Promise.all(vendors.map((v) => rpc<SuggestedOrder>('suggested_order', { p_vendor_id: v.id })))).map((s) => [s.vendor.id, suggestionSummary(s)]));
   return (
     <div className="space-y-5">
       <PageHeader title="Ordering center" subtitle="Orders are placed on each vendor's own website. Log them here so deliveries can be checked against what was ordered." />
-      <Alert tone="info" title="Suggested order quantities arrive in Phase 3">
-        Forecast-based suggested quantities (with a WHY? breakdown) are not built yet. Today each vendor card shows what is running low;
-        use LOG AN ORDER to build the list, copy it, open the vendor website, and record the order.
+      <Alert tone="info" title="How ordering works">
+        Tap VIEW SUGGESTED ORDER: quantities are worked out from par levels or recent usage, on hand and what is already on order
+        (tap WHY? on any line). Adjust, COPY ORDER LIST, OPEN the vendor website and place it there, then LOG AS PLACED.
       </Alert>
       {vendors.length === 0 && <EmptyState title="No vendors set up" />}
       <div className="grid gap-4 lg:grid-cols-2">
         {vendors.map((v) => {
-          const nd = nextDelivery(today, v.delivery_days, v.lead_time_days, v.order_cutoff_time);
+          const nd = nextDelivery(today, v.delivery_days, v.lead_time_days, v.order_cutoff_time, nowTime);
+          const sg = suggested.get(v.id);
           const low = onhand.filter((o) => vendorOf.get(o.product_id) === v.id).sort((a, b) => a.product_name.localeCompare(b.product_name));
           const text = `${v.name.toUpperCase()} — LOW STOCK (${fmtDate(today)})\n` + low.map((o) => `${o.product_name} — on hand ${fmtQty(o.quantity)} ${o.inventory_unit}${o.par_level !== null ? `, par ${fmtQty(o.par_level)}` : ''}`).join('\n');
           return (
@@ -48,6 +52,12 @@ export default async function OrderingPage() {
                   ) : <p className="text-sm text-slate-500">Delivery days not set.</p>}
                 </div>
               </div>
+              {sg && (
+                <div className="rounded-xl bg-brand/5 p-3">
+                  <p className="text-sm font-bold uppercase text-slate-500">Suggested order</p>
+                  <p className="text-lg">{sg.count === 0 ? 'Nothing needed right now' : <><strong>{sg.count} item{sg.count === 1 ? '' : 's'}</strong> · est. <strong className="tabular-nums">{fmtMoney(sg.total)}</strong>{sg.missingPrice && <span className="text-sm text-slate-500"> (some prices missing)</span>}</>}</p>
+                </div>
+              )}
               <div>
                 <p className="mb-1 text-sm font-bold uppercase text-slate-500">Low / critical items ({low.length})</p>
                 {low.length === 0 ? <p className="text-slate-600">Nothing below its low-stock level.</p> : (
@@ -61,6 +71,7 @@ export default async function OrderingPage() {
                   <a href={v.ordering_url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 items-center rounded-xl bg-brand px-5 font-bold text-white">OPEN {v.name.toUpperCase()} WEBSITE</a>
                 ) : v.vendor_type === 'external' ? <span className="text-sm text-amber-800">No ordering website set — add it on the vendor page.</span>
                   : <span className="text-sm text-slate-600">Internal commissary: send product with Transfers. Commissary order forms arrive in Phase 4.</span>}
+                <LinkButton href={`/ordering/new?vendor=${v.id}&suggested=1`} size="lg">VIEW SUGGESTED ORDER</LinkButton>
                 <LinkButton href={`/ordering/new?vendor=${v.id}`} size="lg" variant="secondary">LOG AN ORDER</LinkButton>
                 {low.length > 0 && <CopyList text={text} label="COPY LOW-STOCK LIST" />}
               </div>

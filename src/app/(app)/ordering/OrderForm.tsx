@@ -13,12 +13,18 @@ import { QtyInput, parseQty } from '@/components/forms/QtyInput';
 import { useActionError } from '@/components/forms/useActionError';
 import { Alert, Button, Card, Field, Input } from '@/components/ui';
 import { CopyList } from './CopyList';
-import { fmtMoney } from '@/lib/format';
+import { fmtMoney, fmtQty } from '@/lib/format';
+import type { SuggestionLine } from '@/lib/suggestions';
+import { WhyPanel } from '@/components/ordering/WhyPanel';
 
 export interface OrderLine { product_id: string; qty: string; unit: string; price: string }
 interface Initial { id?: string; expected_delivery_date: string; vendor_confirmation: string; notes: string; lines: OrderLine[] }
 
-export function OrderForm({ vendor, vendorItems, catalog, today, initial }: { vendor: VendorRow; vendorItems: VendorItem[]; catalog: Catalog; today: string; initial: Initial }) {
+export function OrderForm({ vendor, vendorItems, catalog, today, initial, suggestions = {}, useSuggestion = false }: {
+  vendor: VendorRow; vendorItems: VendorItem[]; catalog: Catalog; today: string; initial: Initial;
+  /** system suggestion (and WHY) per product, when the order is built from the suggested order */
+  suggestions?: Record<string, SuggestionLine>; useSuggestion?: boolean;
+}) {
   const toMsg = useActionError();
   const router = useRouter();
   const [lines, setLines] = useState<OrderLine[]>(initial.lines);
@@ -59,7 +65,7 @@ export function OrderForm({ vendor, vendorItems, catalog, today, initial }: { ve
     setErr(null);
     start(async () => {
       const r = await saveOrder({
-        id: initial.id, vendor_id: vendor.id, status, expected_delivery_date: delivery, vendor_confirmation: confirmation, notes,
+        id: initial.id, vendor_id: vendor.id, status, expected_delivery_date: delivery, vendor_confirmation: confirmation, notes, use_suggestion: useSuggestion,
         items: lines.map((l) => ({ product_id: l.product_id, quantity: parseQty(l.qty)!, unit_code: l.unit, unit_price: parseQty(l.price) })),
       }).catch(() => null);
       if (!r) return setErr('Could not reach the server. Nothing was saved.');
@@ -91,10 +97,12 @@ export function OrderForm({ vendor, vendorItems, catalog, today, initial }: { ve
           const p = byId.get(l.product_id);
           if (!p) return null;
           const vi = vItem.get(p.id);
+          const sg = suggestions[p.id];
+          const changed = sg && (parseQty(l.qty) !== Number(sg.suggested_qty) || l.unit !== sg.order_unit);
           return (
             <div key={l.product_id} className="rounded-xl border border-slate-200 p-3">
               <div className="mb-2 flex items-start justify-between gap-2">
-                <div><p className="font-bold">{p.name}</p><p className="text-xs text-slate-500">{vi?.vendor_sku ? `${vendor.name} SKU ${vi.vendor_sku}` : `Not a usual ${vendor.name} item`}</p></div>
+                <div><p className="font-bold">{p.name}</p><p className="text-xs text-slate-500">{vi?.vendor_sku ? `${vendor.name} SKU ${vi.vendor_sku}` : vi ? `${vendor.name} item` : `Not a usual ${vendor.name} item`}</p></div>
                 <button type="button" className="text-sm text-slate-500" onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))}>Remove</button>
               </div>
               <div className="grid grid-cols-3 gap-2">
@@ -106,6 +114,15 @@ export function OrderForm({ vendor, vendorItems, catalog, today, initial }: { ve
                 </Field>
                 <Field label={`Price / ${l.unit}`}><QtyInput aria-label={`${p.name} order price`} value={l.price} onChange={(e) => set(i, { price: e.target.value })} placeholder="$" /></Field>
               </div>
+              {sg && (
+                <div className="mt-2 space-y-1">
+                  <p className="text-sm">
+                    Suggested: <strong className="tabular-nums">{fmtQty(sg.suggested_qty)} {sg.order_unit}</strong>
+                    {changed && <span className="ml-2 font-semibold text-amber-800">Changed by you — both numbers are saved</span>}
+                  </p>
+                  <WhyPanel s={sg} />
+                </div>
+              )}
             </div>
           );
         })}

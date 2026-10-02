@@ -71,3 +71,34 @@ test('Carlos receives the delivery against the logged order (no prices shown to 
   expect(ev.employee).toBe('Carlos');
   expect(errors).toEqual([]);
 });
+
+test('VIEW SUGGESTED ORDER prefills quantities with a WHY? breakdown; overrides keep both numbers', async ({ page }) => {
+  const errors = watchConsole(page);
+  await login(page, 'manager@demo.local');
+  await page.goto('/ordering');
+  const grecoId = (await sql<{ id: string }>(`select id from vendors where code='GRECO'`))[0].id;
+  // Pepperoni: par 25, on hand 12 -> short 13 -> 1 case of 25 ($112.50)
+  const card = page.locator('section', { has: page.getByRole('heading', { name: 'GRECO' }) });
+  await expect(card.getByText(/1 item · est\. \$112\.50/)).toBeVisible();
+  await page.locator(`a[href="/ordering/new?vendor=${grecoId}&suggested=1"]`).click();
+  await expect(page.getByText(/SUGGESTED ORDER — 1 item, est\. \$112\.50/)).toBeVisible();
+  await expect(page.getByLabel('Pepperoni order quantity')).toHaveValue('1');
+  await expect(page.getByLabel('Pepperoni order unit')).toHaveValue('CASE');
+  await page.locator('summary', { hasText: 'WHY?' }).click();
+  await expect(page.getByText('Par level', { exact: true })).toBeVisible();
+  await expect(page.getByText('13 ÷ 25, rounded up = 1 CASE')).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+
+  await page.getByLabel('Pepperoni order quantity').fill('2');
+  await expect(page.getByText('Changed by you — both numbers are saved')).toBeVisible();
+  page.once('dialog', (d) => d.accept());
+  await page.getByRole('button', { name: 'LOG AS PLACED' }).click();
+  await expect(page).toHaveURL(/\/ordering\/[0-9a-f-]{36}$/);
+  await expect(page.getByRole('columnheader', { name: 'Suggested' })).toBeVisible();
+  const row = (await sql<{ suggested_qty: string; quantity: string }>(
+    `select poi.suggested_qty, poi.quantity from purchase_order_items poi join purchase_orders po on po.id = poi.purchase_order_id where po.vendor_id = '${grecoId}'`))[0];
+  expect(row).toEqual({ suggested_qty: '1.0000', quantity: '2.0000' });
+  const audit = (await sql<{ summary: string }>(`select summary from audit_logs where action = 'order.placed' order by id desc limit 1`))[0];
+  expect(audit.summary).toContain('1 quantity changed from the suggestion');
+  expect(errors).toEqual([]);
+});

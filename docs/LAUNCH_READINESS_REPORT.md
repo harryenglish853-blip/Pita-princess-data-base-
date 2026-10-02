@@ -1,10 +1,10 @@
 # Launch readiness report
 
-**Date:** 2026-10-01 · **Scope reviewed:** Phase 1 (foundation) + Phase 2 (core restaurant operations)
+**Date:** 2026-10-01 · **Scope reviewed:** Phase 1 (foundation) + Phase 2 (core restaurant operations) + Phase 3 (suggested ordering)
 
 ## Final recommendation: **NOT READY FOR PRODUCTION**
 
-Phases 1 and 2 are built and pass every automated test listed below. The system must still
+Phases 1, 2 and 3 are built and pass every automated test listed below. The system must still
 **not** be used for real restaurant operations, because:
 
 1. It has only ever run against a **local** Supabase-equivalent stack (same Docker images
@@ -12,17 +12,17 @@ Phases 1 and 2 are built and pass every automated test listed below. The system 
    **BLOCKED — REQUIRES EXTERNAL CONFIGURATION** (Supabase + Vercel accounts, domain).
 2. The owner acceptance checklist (real products, units, case sizes, costs, pars, vendors,
    URLs, employees, count order) has not been done.
-3. Phases 3–8 from the specification (suggested ordering, commissary orders/production,
-   recipes and food cost, Toast, automated email, forecasting/barcode/voice/OCR) are not built.
-   Several of these are part of the required demo flow (steps 16, 22, 23, 26, 27).
+3. Phases 4–8 from the specification (commissary orders/production, recipes and food cost,
+   Toast, immediate alert emails/monthly report, OCR/barcode/voice) are not built.
+   Some of these are part of the required demo flow (steps 16, 22, 26).
 4. Backups/PITR and a restore drill can only be done on a real Supabase project.
 
-## Features completed (Phase 1 + 2)
+## Features completed (Phases 1–3)
 
 | Area | Status |
 |---|---|
 | Next.js 16 app, Tailwind, PWA manifest + service worker | Done |
-| Supabase schema: 10 migrations, RLS on every table, no `anon` access | Done |
+| Supabase schema: 13 migrations, RLS on every table, no `anon` access | Done |
 | 4 login roles; ONE shared employee login; employee profiles; hashed PINs; lockout; session switching; inactivity lock | Done |
 | Employee attribution on every operational record + audit log (login account AND employee) | Done |
 | Products, categories, storage areas, units, central conversion engine, vendors, vendor links | Done |
@@ -32,17 +32,18 @@ Phases 1 and 2 are built and pass every automated test listed below. The system 
 | Waste, transfers (storage areas, restaurant ↔ commissary), manual adjustments | Done |
 | Counts: 6 count types, shelf-to-sheet order (drag/arrows), autosave, offline + sync, multiple counters/conflicts, variance, recount flags, approve, post | Done |
 | Reports + CSV export: inventory value, variance/count history, waste, deliveries/vendor spending, price history, employee activity, audit log | Done |
-| Ordering center: next delivery/cutoff, low-stock list, OPEN SYSCO / OPEN GRECO, **log orders placed on vendor websites** (draft/placed/cancelled, copy order list, confirmation #), receive deliveries against a logged order | Done (suggested quantities = Phase 3) |
+| Ordering center: next delivery/cutoff, low-stock list, OPEN SYSCO / OPEN GRECO, **log orders placed on vendor websites** (draft/placed/cancelled, copy order list, confirmation #), receive deliveries against a logged order | Done |
+| Suggested orders per vendor: par or usage forecast (dynamic par, 28-day ledger usage, until the following delivery, safety stock), minus on hand + open orders + incoming transfers, rounded up to order units; respects delivery days, lead time and cutoff time; WHY? breakdown per line; suggestion and manager quantity both stored (server-computed), overrides counted in the audit log | Done |
 | Employee management, login-account & permission admin (owner), settings, global search | Done |
 | Required invoice photo on every delivery (multi-page, direct upload to private storage, retry, "photo missing" alert until attached) | Done |
 | Daily + weekly email reports with invoice photos attached; owner-managed recipients; preview, send now, history; hourly scheduler sends each period once | Done (delivery via Resend: BLOCKED — REQUIRES EXTERNAL CONFIGURATION) |
 
 ## Features intentionally deferred (clearly labeled in the app; no fake buttons)
 
-Phase 3 suggested orders & purchase-order workflow · Phase 4 commissary order form, email,
+Phase 4 commissary order form, email,
 statuses, production · Phase 5 recipes, nested recipes, recipe cost, actual vs theoretical food
 cost · Phase 6 Toast integration · Phase 7 immediate alert emails and monthly owner report · Phase 8
-forecasting, dynamic pars, OCR, camera barcode scanning, voice counts. Sales and food-cost %
+advanced forecasting (seasonality, Toast sales, events), OCR, camera barcode scanning, voice counts. Sales and food-cost %
 tiles say "Not connected" / "—" rather than showing invented numbers. PDF export uses the
 browser's Print → Save as PDF.
 
@@ -52,10 +53,10 @@ browser's Print → Save as PDF.
 |---|---|
 | Lint (ESLint, Next rules) + TypeScript strict typecheck | Pass, 0 warnings |
 | Production build (`next build`) | Pass (44 routes) |
-| Unit tests (conversion engine vs shared fixtures, CSV escaping/formula injection, time-zone ranges incl. DST, vendor delivery/cutoff, order list text) | 37 / 37 pass |
-| Database / integration tests against real Postgres 15 + Supabase roles (RLS, PIN security, attribution, ledger immutability, receiving/waste/transfer/count math, conversions in SQL, admin, vendor order log, invoice-photo alerts, email report content/attachments/recipients/duplicate-send, mock email provider) | 60 / 60 pass |
+| Unit tests (conversion engine vs shared fixtures, CSV escaping/formula injection, time-zone ranges incl. DST, vendor delivery/cutoff, order list text) | 37 / 37 pass (incl. order cutoff time) |
+| Database / integration tests against real Postgres 15 + Supabase roles (RLS, PIN security, attribution, ledger immutability, receiving/waste/transfer/count math, conversions in SQL, admin, vendor order log, invoice-photo alerts, email report content/attachments/recipients/duplicate-send, mock email provider) | 66 / 66 pass (incl. hand-verified suggested-order math: need 62 + 15 = 77, have 27 + 10 = 37, short 40 → 1 case of 40; par rounding; forged suggestion ignored; overrides audited; employees refused) |
 | Browser E2E — full demo flow, phone size (steps 1–25 and 28 below) | 9 / 9 pass |
-| Browser E2E — log a Sysco order (copy list, open website link, log as placed) then employee receives against it with an invoice photo | 2 / 2 pass |
+| Browser E2E — log a Sysco order (copy list, open website link, log as placed) then employee receives against it with an invoice photo; VIEW SUGGESTED ORDER prefill, WHY?, override, both numbers stored | 3 / 3 pass |
 | Browser E2E — photo required before submit, 2-page invoice upload, owner adds company + manager emails, report preview lists the photos, send-now, scheduler rejects callers without the secret | included in demo flow (10 tests) |
 | Browser E2E — every page × owner / management / employee × phone 412px, tablet 820px, desktop 1440px: renders, no horizontal page scroll, no console errors, forbidden pages refused | 9 / 9 pass |
 
@@ -63,7 +64,7 @@ Demo-flow coverage (spec numbering): 1–4 ✔ · 5–10 ✔ (short shipment, di
 audit "Employee Shared Account / Carlos", alert) · 11–15 ✔ (switch to Maria, waste, attribution)
 · 16 ✘ Toast (Phase 6) · 17–21 ✔ (weekly count incl. Wi-Fi loss and page reload while offline,
 book vs physical, recount flag, verify, approve, post) · 22 partial (variance/value update; food
-cost needs Phase 5) · 23 partial: order lists can be built, copied and logged by hand; automatic suggested quantities are Phase 3 · 24–25 ✔ ·
+cost needs Phase 5) · 23 ✔ suggested order with WHY? · 24–25 ✔ ·
 26 ✘ commissary order form (Phase 4; commissary transfers work) · 27 ✔ weekly report generated with invoice photos (actual delivery needs Resend keys) · 28 ✔.
 
 Also tested: wrong PIN, repeated wrong PIN (lock + alert), device-wide PIN throttling, PIN reset,

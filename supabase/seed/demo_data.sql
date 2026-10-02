@@ -166,6 +166,58 @@ begin
   v_alex := public.create_employee('Alex', 'E-104', '9173', 'Dishwasher', 'Kitchen');
   update public.employees set is_demo = true where id in (v_john, v_maria, v_carlos, v_alex);
 
+  -- Four weeks of demo history (so suggested orders can forecast) -----------------
+  -- Weekly receipts + daily sales usage, ending exactly at the opening-count
+  -- quantity below, so the opening count shows no variance. Busier Fri/Sat.
+  -- Products with par_type 'dynamic' order from this usage forecast.
+  declare
+    v_actor app.actor := row(v_mgr, 'manager', 'Management', null, null, null, null, null)::app.actor;
+    v_today date := (now() at time zone 'America/New_York')::date;
+    v_day date;
+    v_use numeric;
+    v_week numeric;
+    v_whole boolean;
+  begin
+    for r in
+      select p.id, p.item_code, p.inventory_unit, p.primary_vendor_id, p.current_cost, h.daily, h.target
+        from public.products p
+        join (values
+          ('P-CHKBR', 9, 60), ('P-GRBEEF', 6, 42), ('P-BACON', 2, 14), ('P-PEPP', 1.8, 12), ('P-SALMON', 1.2, 9),
+          ('P-CREAM', 1.5, 10), ('P-BUTTER', 2.2, 15), ('P-MOZZ', 4.5, 28), ('P-CHED', 2, 16), ('P-TOMATO', 3.5, 22),
+          ('P-LETTUCE', 2.6, 18), ('P-AVO', 7, 30), ('P-ONION', 3, 35), ('P-FRIES', 9, 75), ('P-BUNS', 14, 140),
+          ('P-OIL', 0.8, 6), ('P-FLOUR', 6, 80), ('P-RICE', 3, 32), ('P-DOUGH', 9, 90), ('P-MARI', 1.8, 14),
+          ('P-MEATB', 8, 60), ('P-COKE', 8, 110), ('P-SPRITE', 5, 60), ('P-NAPKIN', 300, 4500), ('P-TOGO', 25, 250),
+          ('P-GLOVES', 0.5, 4), ('P-SANI', 0.4, 3)
+        ) as h(code, daily, target) on h.code = p.item_code
+       order by p.item_code
+    loop
+      v_whole := r.inventory_unit in ('EA', 'BOX');
+      for w in 0..3 loop
+        -- this week's usage (days -28+7w .. -22+7w)
+        v_week := 0;
+        for i in 0..6 loop
+          v_day := v_today - 28 + 7 * w + i;
+          v_use := r.daily * case extract(dow from v_day) when 5 then 1.35 when 6 then 1.35 when 0 then 1.1 else 0.85 end;
+          v_week := v_week + case when v_whole then round(v_use) else round(v_use, 2) end;
+        end loop;
+        perform app.post_inventory_txn(v_actor, v_main, r.id, 'RECEIPT', v_week + case when w = 0 then r.target else 0 end,
+          r.current_cost, 'demo_history', null, ((v_today - 28 + 7 * w)::timestamp + interval '7 hours') at time zone 'America/New_York',
+          null, 'Demo history', r.primary_vendor_id, null, 'Demo delivery history');
+        for i in 0..6 loop
+          v_day := v_today - 28 + 7 * w + i;
+          v_use := r.daily * case extract(dow from v_day) when 5 then 1.35 when 6 then 1.35 when 0 then 1.1 else 0.85 end;
+          v_use := case when v_whole then round(v_use) else round(v_use, 2) end;
+          continue when v_use = 0;
+          perform app.post_inventory_txn(v_actor, v_main, r.id, 'POS_THEORETICAL_CONSUMPTION', -v_use, null, 'demo_history', null,
+            (v_day::timestamp + interval '22 hours') at time zone 'America/New_York', null, null, null, 'Demo sales usage', null);
+        end loop;
+      end loop;
+    end loop;
+  end;
+  update public.location_products set par_type = 'dynamic'
+   where location_id = v_main
+     and product_id in (select id from public.products where item_code in ('P-CHKBR', 'P-GRBEEF', 'P-MOZZ', 'P-AVO', 'P-FRIES', 'P-BUNS', 'P-TOMATO', 'P-LETTUCE'));
+
   -- Opening inventory: a real count through the count workflow -----------------
   v_count := public.start_count(jsonb_build_object('count_type', 'weekly_full', 'name', 'Opening inventory (demo)'));
   v_sheet := public.get_count_sheet(v_count);
