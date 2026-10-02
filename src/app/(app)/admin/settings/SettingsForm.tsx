@@ -31,7 +31,7 @@ export function SettingsForm({ settings, orgName, timezone }: { settings: { key:
         <CardTitle>Rules & thresholds</CardTitle>
         {settings.map((s) => (
           <div key={s.key} className="grid items-end gap-2 sm:grid-cols-[1fr_8rem_auto]">
-            <Field label={s.key.replace(/[._]/g, ' ')} hint={s.description}><span className="sr-only">{s.key}</span></Field>
+            <div><p className="text-sm font-semibold capitalize">{s.key.replace(/[._]/g, ' ')}</p><p className="text-xs text-slate-500">{s.description}</p></div>
             <Input aria-label={s.key} inputMode="decimal" value={vals[s.key]} onChange={(e) => setVals({ ...vals, [s.key]: e.target.value })} />
             <Button variant="secondary" disabled={pending || vals[s.key] === String(s.value)} onClick={() => start(async () => {
               const r = await saveSetting(s.key, Number(vals[s.key]));

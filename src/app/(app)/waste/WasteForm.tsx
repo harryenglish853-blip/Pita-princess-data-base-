@@ -72,7 +72,7 @@ export function WasteForm({ catalog, reasons, actor }: { catalog: Catalog; reaso
             </Field>
           </div>
           {preview && <p className="text-sm font-semibold text-slate-600">{preview}</p>}
-          <Field label="Reason">
+          <Field group label="Reason">
             <div className="grid grid-cols-2 gap-2">
               {reasons.map((r) => (
                 <button key={r.code} type="button" aria-pressed={reason === r.code} onClick={() => setReason(r.code)}

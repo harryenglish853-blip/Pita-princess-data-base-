@@ -32,7 +32,7 @@ Phases 1 and 2 are built and pass every automated test listed below. The system 
 | Waste, transfers (storage areas, restaurant ↔ commissary), manual adjustments | Done |
 | Counts: 6 count types, shelf-to-sheet order (drag/arrows), autosave, offline + sync, multiple counters/conflicts, variance, recount flags, approve, post | Done |
 | Reports + CSV export: inventory value, variance/count history, waste, deliveries/vendor spending, price history, employee activity, audit log | Done |
-| Ordering center: next delivery/cutoff, low-stock list, copy list, OPEN SYSCO / OPEN GRECO | Done (quantities = Phase 3) |
+| Ordering center: next delivery/cutoff, low-stock list, OPEN SYSCO / OPEN GRECO, **log orders placed on vendor websites** (draft/placed/cancelled, copy order list, confirmation #), receive deliveries against a logged order | Done (suggested quantities = Phase 3) |
 | Employee management, login-account & permission admin (owner), settings, global search | Done |
 
 ## Features intentionally deferred (clearly labeled in the app; no fake buttons)
@@ -50,16 +50,17 @@ browser's Print → Save as PDF.
 |---|---|
 | Lint (ESLint, Next rules) + TypeScript strict typecheck | Pass, 0 warnings |
 | Production build (`next build`) | Pass (44 routes) |
-| Unit tests (conversion engine vs shared fixtures, CSV escaping/formula injection, time-zone ranges incl. DST, vendor delivery/cutoff) | 36 / 36 pass |
-| Database tests against real Postgres 15 + Supabase roles (RLS, PIN security, attribution, ledger immutability, receiving/waste/transfer/count math, conversions in SQL, admin) | 50 / 50 pass |
+| Unit tests (conversion engine vs shared fixtures, CSV escaping/formula injection, time-zone ranges incl. DST, vendor delivery/cutoff, order list text) | 37 / 37 pass |
+| Database tests against real Postgres 15 + Supabase roles (RLS, PIN security, attribution, ledger immutability, receiving/waste/transfer/count math, conversions in SQL, admin, vendor order log) | 54 / 54 pass |
 | Browser E2E — full demo flow, phone size (steps 1–25 and 28 below) | 9 / 9 pass |
+| Browser E2E — log a Sysco order (copy list, open website link, log as placed) then employee receives against it | 2 / 2 pass |
 | Browser E2E — every page × owner / management / employee × phone 412px, tablet 820px, desktop 1440px: renders, no horizontal page scroll, no console errors, forbidden pages refused | 9 / 9 pass |
 
 Demo-flow coverage (spec numbering): 1–4 ✔ · 5–10 ✔ (short shipment, discrepancy, +160 LB only,
 audit "Employee Shared Account / Carlos", alert) · 11–15 ✔ (switch to Maria, waste, attribution)
 · 16 ✘ Toast (Phase 6) · 17–21 ✔ (weekly count incl. Wi-Fi loss and page reload while offline,
 book vs physical, recount flag, verify, approve, post) · 22 partial (variance/value update; food
-cost needs Phase 5) · 23 ✘ suggested quantities (Phase 3; low-stock lists exist) · 24–25 ✔ ·
+cost needs Phase 5) · 23 partial: order lists can be built, copied and logged by hand; automatic suggested quantities are Phase 3 · 24–25 ✔ ·
 26 ✘ commissary order form (Phase 4; commissary transfers work) · 27 ✘ email (Phase 7) · 28 ✔.
 
 Also tested: wrong PIN, repeated wrong PIN (lock + alert), device-wide PIN throttling, PIN reset,
@@ -78,6 +79,7 @@ last-owner removal, self-demotion, privilege escalation attempts by management.
 | HIGH (data loss) | Count screen showed SAVED while the last typed value was still in a 600 ms debounce, not yet on the device | Every keystroke written to IndexedDB immediately (serialized); SAVED only when nothing pending; E2E reload-while-offline test |
 | MEDIUM (data) | Saving a product deleted its storage assignments at other locations | Scoped to edited location + test |
 | MEDIUM | Invalid money format in SQL audit text; receiving price-change used a stale factor | Fixed + tests |
+| MEDIUM (accessibility) | Most form labels were not linked to their inputs (screen readers) | Shared Field component now always associates label and control |
 
 ## Known issues (open)
 

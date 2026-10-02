@@ -1,10 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useRef, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import type { Catalog, CatalogProduct } from '@/lib/types';
 import { allowedUnits, toInventoryQty, formatQty } from '@/lib/units/convert';
-import { submitReceiving, uploadInvoice, type ReceivingResult } from '../actions';
+import { submitReceiving, uploadInvoice, openOrders, type ReceivingResult, type OpenOrder } from '../actions';
 import { ProductPicker } from '@/components/forms/ProductPicker';
 import { QtyInput, parseQty } from '@/components/forms/QtyInput';
 import { useActionError, newKey } from '@/components/forms/useActionError';
@@ -42,9 +42,12 @@ function linePreview(l: Line): string[] {
   return flags;
 }
 
-export function ReceiveForm({ catalog, today, actor }: { catalog: Catalog; today: string; actor: string }) {
+export function ReceiveForm({ catalog, today, actor, initialVendorId = null, initialOrderId = null }: { catalog: Catalog; today: string; actor: string; initialVendorId?: string | null; initialOrderId?: string | null }) {
   const toMsg = useActionError();
-  const [vendorId, setVendorId] = useState<string | null>(null);
+  const [vendorId, setVendorId] = useState<string | null>(initialVendorId);
+  const [orders, setOrders] = useState<OpenOrder[]>([]);
+  const [orderId, setOrderId] = useState<string | null>(null);
+  const [orderAsked, setOrderAsked] = useState(false);
   const [invoice, setInvoice] = useState('');
   const [date, setDate] = useState(today);
   const [tempOk, setTempOk] = useState<'' | 'yes' | 'no'>('');
@@ -57,6 +60,29 @@ export function ReceiveForm({ catalog, today, actor }: { catalog: Catalog; today
   const key = useRef(newKey());
 
   const vendor = catalog.vendors.find((v) => v.id === vendorId) ?? null;
+
+  useEffect(() => {
+    if (!vendorId) return;
+    let cancelled = false;
+    openOrders(vendorId).then((r) => {
+      if (cancelled || !r.ok) return;
+      setOrders(r.data);
+      const pre = r.data.find((o) => o.id === initialOrderId);
+      if (pre) applyOrder(pre);
+    }).catch(() => undefined);
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vendorId]);
+
+  function applyOrder(o: OpenOrder) {
+    const byId = new Map(catalog.products.map((p) => [p.id, p]));
+    setOrderId(o.id);
+    setOrderAsked(true);
+    setLines(o.items.filter((i) => byId.has(i.product_id)).map((i) => ({
+      key: newKey(), product: byId.get(i.product_id)!, unit: i.unit_code, ordered: String(Number(i.quantity)), received: '', invoiced: '',
+      rejected: '', rejectReason: '', issue: '', price: i.unit_price === null ? '' : String(Number(i.unit_price)), notes: '', open: false,
+    })));
+  }
   const featured = catalog.vendors.filter((v) => ['SYSCO', 'GRECO', 'COMMISSARY'].includes(v.code));
   const others = catalog.vendors.filter((v) => !['SYSCO', 'GRECO', 'COMMISSARY'].includes(v.code));
   const units = catalog.units;
@@ -102,6 +128,7 @@ export function ReceiveForm({ catalog, today, actor }: { catalog: Catalog; today
         vendor_id: vendor!.id,
         invoice_number: invoice.trim() || null,
         delivery_date: date,
+        purchase_order_id: orderId,
         temperature_ok: tempOk === '' ? null : tempOk === 'yes',
         notes: notes.trim() || null,
         lines: lines.slice().reverse().map((l) => ({
@@ -154,8 +181,22 @@ export function ReceiveForm({ catalog, today, actor }: { catalog: Catalog; today
           <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Receiving from</p>
           <h1 className="text-2xl font-black">{vendor.name.toUpperCase()}</h1>
         </div>
-        <Button variant="ghost" onClick={() => { if (lines.length === 0 || confirm('Change vendor? Items entered so far stay on the list.')) setVendorId(null); }}>Change vendor</Button>
+        <Button variant="ghost" onClick={() => { if (lines.length === 0 || confirm('Change vendor? Items entered so far stay on the list.')) { setVendorId(null); setOrders([]); setOrderId(null); setOrderAsked(false); } }}>Change vendor</Button>
       </div>
+
+      {orders.length > 0 && !orderAsked && (
+        <Card className="space-y-2">
+          <p className="font-bold">Is this delivery for an order that was logged?</p>
+          {orders.map((o) => (
+            <Button key={o.id} variant="secondary" size="lg" className="w-full justify-between" onClick={() => applyOrder(o)}>
+              <span>Order #{o.po_number}{o.vendor_confirmation ? ` (${o.vendor_confirmation})` : ''}</span>
+              <span className="text-sm text-slate-600">{o.items.length} items{o.expected_delivery_date ? ` · expected ${o.expected_delivery_date}` : ''}</span>
+            </Button>
+          ))}
+          <Button variant="ghost" className="w-full" onClick={() => setOrderAsked(true)}>No order — enter items by hand</Button>
+        </Card>
+      )}
+      {orderId && <Alert tone="info" title={`Receiving against order #${orders.find((o) => o.id === orderId)?.po_number ?? ''}`}>Ordered quantities are filled in. Enter what actually arrived on every line — tap “All arrived” only if the full amount is here.</Alert>}
 
       <Card className="grid gap-3 sm:grid-cols-2">
         <Field label={vendor.vendor_type === 'external' ? 'Invoice number' : 'Invoice / ticket number (optional)'} htmlFor="inv">
@@ -164,7 +205,7 @@ export function ReceiveForm({ catalog, today, actor }: { catalog: Catalog; today
         <Field label="Delivery date" htmlFor="date">
           <Input id="date" type="date" value={date} max={today} onChange={(e) => setDate(e.target.value)} />
         </Field>
-        <Field label="Cold items arrived at a safe temperature?">
+        <Field group label="Cold items arrived at a safe temperature?">
           <div className="grid grid-cols-3 gap-2">
             {(['yes', 'no', ''] as const).map((t) => (
               <button key={t || 'na'} type="button" onClick={() => setTempOk(t)} aria-pressed={tempOk === t}
@@ -225,6 +266,7 @@ export function ReceiveForm({ catalog, today, actor }: { catalog: Catalog; today
                       <Field label="Received"><QtyInput aria-label={`${l.product.name} received`} value={l.received} onChange={(e) => update(l.key, { received: e.target.value })} /></Field>
                       <Field label="Invoiced"><QtyInput aria-label={`${l.product.name} invoiced`} value={l.invoiced} onChange={(e) => update(l.key, { invoiced: e.target.value })} /></Field>
                     </div>
+                    {l.ordered && <Button size="sm" variant="secondary" onClick={() => update(l.key, { received: l.ordered })}>All arrived ({l.ordered} {l.unit})</Button>}
                     {invPreview && <p className="text-sm font-semibold text-slate-600">{invPreview}</p>}
                     <div className="grid grid-cols-2 gap-2">
                       <Field label={`Invoice price per ${l.unit}`}><QtyInput aria-label={`${l.product.name} price`} value={l.price} onChange={(e) => update(l.key, { price: e.target.value })} placeholder="$" /></Field>

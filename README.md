@@ -1,6 +1,6 @@
 # Restaurant Inventory — private operations website
 
-A private, mobile-first web application for restaurant inventory, receiving, waste,
+A private, mobile-first **website** (not an app-store app) for restaurant inventory, receiving, waste,
 transfers, physical counts and (in later phases) purchasing, recipes, food cost, Toast
 sales and automated email reports. It is **not** a public site and **not** an app-store
 app: staff open a private URL on phones, tablets or computers and can add it to their
@@ -39,7 +39,11 @@ Carlos and Maria share one login.
   book-vs-physical variance, recount flags, approve, post
 - Owner control center, management dashboard, simple employee home, attention center, tasks, alerts
 - Reports (inventory value, variance, waste, deliveries & vendor spending, price history, employee
-  activity, audit log) with CSV export; ordering center with OPEN SYSCO / OPEN GRECO buttons
+  activity, audit log) with CSV export
+- Ordering center: vendors are NOT integrated — each vendor card has OPEN SYSCO / OPEN GRECO
+  (opens the vendor's own website), a low-stock list, and LOG AN ORDER: build the list, COPY ORDER
+  LIST, place it on the vendor website, then log it here (with the vendor confirmation #).
+  Deliveries can be received against a logged order, so short/over shipments are caught.
 - Employee profile management (add, rename, reset PIN, deactivate — history kept)
 
 Not built yet (clearly labeled in the app): suggested orders (Phase 3), commissary order forms

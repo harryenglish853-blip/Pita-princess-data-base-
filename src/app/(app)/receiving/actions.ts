@@ -24,6 +24,7 @@ const receivingSchema = z.object({
   vendor_id: z.string().uuid(),
   invoice_number: z.string().trim().max(40).nullable(),
   delivery_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  purchase_order_id: z.string().uuid().nullable(),
   temperature_ok: z.boolean().nullable(),
   notes: z.string().max(1000).nullable(),
   lines: z.array(lineSchema).min(1, 'Add at least one item.').max(200),
@@ -89,4 +90,15 @@ export async function resolveDiscrepancy(id: string, eventId: string, status: st
     revalidatePath('/dashboard');
   }
   return r;
+}
+
+export interface OpenOrder {
+  id: string; po_number: number; expected_delivery_date: string | null; placed_at: string | null; vendor_confirmation: string | null;
+  items: { product_id: string; quantity: number; unit_code: string; unit_price: number | null }[];
+}
+
+/** Orders logged for this vendor that have not been received yet (prices only for management). */
+export async function openOrders(vendorId: string): Promise<ActionResult<OpenOrder[]>> {
+  if (!z.string().uuid().safeParse(vendorId).success) return { ok: false, error: { code: 'VALIDATION', message: 'Invalid vendor.' } };
+  return callRpc<OpenOrder[]>('open_orders_for_receiving', { p_vendor_id: vendorId });
 }

@@ -114,16 +114,42 @@ export function Alert({ tone = 'bad', title, children }: { tone?: Tone; title?: 
   );
 }
 
-export function Field({ label, hint, error, children, htmlFor }: { label: string; hint?: ReactNode; error?: string; children: ReactNode; htmlFor?: string }) {
+/**
+ * Labeled form field. The label is always associated with its control:
+ * via htmlFor when given, otherwise by wrapping the control in the <label>.
+ * Use `group` for button groups (radio-like choices), which get role="group".
+ */
+export function Field({ label, hint, error, children, htmlFor, group }: { label: string; hint?: ReactNode; error?: string; children: ReactNode; htmlFor?: string; group?: boolean }) {
+  const extra = (
+    <>
+      {hint && !error && <span className="block text-xs font-normal text-slate-500">{hint}</span>}
+      {error && <span className="block text-sm font-medium text-red-700">{error}</span>}
+    </>
+  );
+  if (group) {
+    return (
+      <div role="group" aria-label={label} className="flex flex-col gap-1">
+        <p className="text-sm font-semibold text-slate-800">{label}</p>
+        {children}
+        {extra}
+      </div>
+    );
+  }
+  if (htmlFor) {
+    return (
+      <div className="flex flex-col gap-1">
+        <label htmlFor={htmlFor} className="text-sm font-semibold text-slate-800">{label}</label>
+        {children}
+        {extra}
+      </div>
+    );
+  }
   return (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={htmlFor} className="text-sm font-semibold text-slate-800">
-        {label}
-      </label>
+    <label className="flex flex-col gap-1">
+      <span className="text-sm font-semibold text-slate-800">{label}</span>
       {children}
-      {hint && !error && <p className="text-xs text-slate-500">{hint}</p>}
-      {error && <p className="text-sm font-medium text-red-700">{error}</p>}
-    </div>
+      {extra}
+    </label>
   );
 }
 

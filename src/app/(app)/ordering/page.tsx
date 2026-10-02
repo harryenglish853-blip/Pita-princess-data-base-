@@ -2,8 +2,9 @@ import type { Metadata } from 'next';
 import { requirePermission } from '@/lib/auth/context';
 import { query } from '@/lib/data';
 import { nextDelivery, fmtCutoff } from '@/lib/vendors';
-import { fmtDate, fmtQty, todayInTz, DEFAULT_TZ } from '@/lib/format';
-import { Alert, Card, EmptyState, PageHeader, StockBadge } from '@/components/ui';
+import { fmtDate, fmtDateTime, fmtMoney, fmtQty, todayInTz, DEFAULT_TZ } from '@/lib/format';
+import Link from 'next/link';
+import { Alert, Badge, Card, CardTitle, EmptyState, LinkButton, PageHeader, StockBadge, Table, Td, Th } from '@/components/ui';
 import { CopyList } from './CopyList';
 
 export const metadata: Metadata = { title: 'Ordering center' };
@@ -16,18 +17,20 @@ export default async function OrderingPage() {
   const tz = ctx.organization?.timezone ?? DEFAULT_TZ;
   const today = todayInTz(tz);
   const loc = ctx.location?.id ?? '';
-  const [vendors, onhand, products] = await Promise.all([
+  const [vendors, onhand, products, orders] = await Promise.all([
     query<V[]>((s) => s.from('vendors').select('id, name, code, vendor_type, ordering_url, delivery_days, order_cutoff_time, lead_time_days').eq('is_active', true).order('name')),
     query<OH[]>((s) => s.from('inventory_on_hand').select('product_id, product_name, quantity, par_level, inventory_unit, stock_status').eq('location_id', loc).eq('is_active', true).neq('stock_status', 'HEALTHY')),
     query<{ id: string; primary_vendor_id: string | null }[]>((s) => s.from('products').select('id, primary_vendor_id').eq('is_active', true)),
+    query<{ id: string; po_number: number; status: string; expected_delivery_date: string | null; estimated_total: number | null; placed_at: string | null; created_at: string; vendors: { name: string } | null; purchase_order_items: { product_id: string }[] }[]>((s) =>
+      s.from('purchase_orders').select('id, po_number, status, expected_delivery_date, estimated_total, placed_at, created_at, vendors(name), purchase_order_items(product_id)').order('created_at', { ascending: false }).limit(30)),
   ]);
   const vendorOf = new Map(products.map((p) => [p.id, p.primary_vendor_id]));
   return (
     <div className="space-y-5">
-      <PageHeader title="Ordering center" subtitle="Place Sysco and Greco orders on their own websites. This list shows what is running low." />
+      <PageHeader title="Ordering center" subtitle="Orders are placed on each vendor's own website. Log them here so deliveries can be checked against what was ordered." />
       <Alert tone="info" title="Suggested order quantities arrive in Phase 3">
-        Forecast-based suggested orders (usage until next delivery + safety stock − on hand − incoming, rounded to cases, with a WHY? breakdown) are not built yet.
-        Today this page shows the items at or below their low-stock level so management can order on the vendor website.
+        Forecast-based suggested quantities (with a WHY? breakdown) are not built yet. Today each vendor card shows what is running low;
+        use LOG AN ORDER to build the list, copy it, open the vendor website, and record the order.
       </Alert>
       {vendors.length === 0 && <EmptyState title="No vendors set up" />}
       <div className="grid gap-4 lg:grid-cols-2">
@@ -58,12 +61,27 @@ export default async function OrderingPage() {
                   <a href={v.ordering_url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 items-center rounded-xl bg-brand px-5 font-bold text-white">OPEN {v.name.toUpperCase()} WEBSITE</a>
                 ) : v.vendor_type === 'external' ? <span className="text-sm text-amber-800">No ordering website set — add it on the vendor page.</span>
                   : <span className="text-sm text-slate-600">Internal commissary: send product with Transfers. Commissary order forms arrive in Phase 4.</span>}
+                <LinkButton href={`/ordering/new?vendor=${v.id}`} size="lg" variant="secondary">LOG AN ORDER</LinkButton>
                 {low.length > 0 && <CopyList text={text} label="COPY LOW-STOCK LIST" />}
               </div>
             </Card>
           );
         })}
       </div>
+      <section>
+        <CardTitle>Logged orders</CardTitle>
+        {orders.length === 0 ? <EmptyState title="No orders logged yet" /> : (
+          <Table>
+            <thead><tr><Th>Order</Th><Th>Vendor</Th><Th>Logged</Th><Th>Expected</Th><Th className="text-right">Items</Th><Th className="text-right">Est. total</Th><Th>Status</Th></tr></thead>
+            <tbody>{orders.map((o) => (
+              <tr key={o.id}><Td><Link className="font-semibold text-brand hover:underline" href={`/ordering/${o.id}`}>#{o.po_number}</Link></Td><Td>{o.vendors?.name}</Td>
+                <Td>{fmtDateTime(o.placed_at ?? o.created_at, tz)}</Td><Td>{fmtDate(o.expected_delivery_date)}</Td>
+                <Td className="text-right">{o.purchase_order_items.length}</Td><Td className="text-right tabular-nums">{fmtMoney(o.estimated_total)}</Td>
+                <Td><Badge tone={o.status === 'placed' ? 'warn' : o.status === 'received' ? 'good' : 'neutral'}>{o.status === 'placed' ? 'Waiting for delivery' : o.status}</Badge></Td></tr>))}
+            </tbody>
+          </Table>
+        )}
+      </section>
     </div>
   );
 }
