@@ -12,3 +12,10 @@ export async function setAlertStatus(id: string, status: 'acknowledged' | 'resol
   if (r.ok) { revalidatePath('/alerts'); revalidatePath('/dashboard'); }
   return r;
 }
+
+/** Run the anomaly checks now (they also run on the server schedule). */
+export async function runAnomalyChecks(): Promise<ActionResult<unknown[]>> {
+  const r = await callRpc<unknown[]>('run_anomaly_checks');
+  if (r.ok) { revalidatePath('/alerts'); revalidatePath('/dashboard'); }
+  return r;
+}

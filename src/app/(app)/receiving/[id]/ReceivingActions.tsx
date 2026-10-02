@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { reviewReceiving, resolveDiscrepancy } from '../actions';
+import { readInvoicePhotos, reviewInvoiceReading, reviewReceiving, resolveDiscrepancy } from '../actions';
 import { uploadInvoiceFile } from '@/components/forms/invoiceUpload';
 import { useActionError } from '@/components/forms/useActionError';
 import { Button, Input } from '@/components/ui';
@@ -68,6 +68,44 @@ export function InvoiceUpload({ eventId }: { eventId: string }) {
         }} />
       </label>
       {err && <p className="mt-1 text-sm text-red-700">{err}</p>}
+    </div>
+  );
+}
+
+export function ReadInvoiceButton({ eventId, again }: { eventId: string; again: boolean }) {
+  const toMsg = useActionError();
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [err, setErr] = useState<string | null>(null);
+  return (
+    <div className="space-y-1">
+      <Button variant="secondary" disabled={pending} onClick={() => start(async () => {
+        setErr(null);
+        const r = await readInvoicePhotos(eventId);
+        if (!r.ok) setErr(toMsg(r.error)); else router.refresh();
+      })}>{pending ? 'Reading the invoice…' : again ? 'READ INVOICE AGAIN' : 'READ INVOICE (AI)'}</Button>
+      {err && <p role="alert" className="text-sm text-red-700">{err}</p>}
+    </div>
+  );
+}
+
+export function ReviewInvoiceReading({ id, eventId }: { id: string; eventId: string }) {
+  const toMsg = useActionError();
+  const router = useRouter();
+  const [note, setNote] = useState('');
+  const [pending, start] = useTransition();
+  const [err, setErr] = useState<string | null>(null);
+  const act = (d: 'confirmed' | 'discarded') => start(async () => {
+    setErr(null);
+    const r = await reviewInvoiceReading(id, eventId, d, note);
+    if (!r.ok) setErr(toMsg(r.error)); else router.refresh();
+  });
+  return (
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <Input placeholder="Note (e.g. called Sysco about the price)" value={note} onChange={(e) => setNote(e.target.value)} aria-label="Invoice check note" className="sm:max-w-sm" />
+      <Button variant="success" disabled={pending} onClick={() => act('confirmed')}>CONFIRM CHECKED</Button>
+      <Button variant="ghost" disabled={pending} onClick={() => act('discarded')}>DISCARD</Button>
+      {err && <p role="alert" className="text-sm text-red-700">{err}</p>}
     </div>
   );
 }

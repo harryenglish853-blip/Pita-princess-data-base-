@@ -10,6 +10,10 @@ import { parseQty } from '@/components/forms/QtyInput';
 import { ProductPicker } from '@/components/forms/ProductPicker';
 import { useActionError, newKey } from '@/components/forms/useActionError';
 import { Alert, Badge, Button } from '@/components/ui';
+import { VoiceCount } from '@/components/scan/VoiceCount';
+import { BarcodeScanner } from '@/components/scan/BarcodeScanner';
+import { lookupBarcode } from '../../scan/actions';
+import type { VoiceProduct, VoiceResult } from '@/lib/voice/parse';
 
 export interface SheetEntry {
   id: string;
@@ -251,6 +255,42 @@ export function CountSheet({ sheet }: { sheet: Sheet }) {
     persist(e, fields);
   }
 
+  /** Fill a line from voice: the spoken units when the line has those boxes, otherwise the total in the inventory unit. */
+  function applyVoice(r: VoiceResult & { product: VoiceProduct }) {
+    if (locked) return;
+    const cands = entries.filter((x) => x.product_id === r.product.id);
+    const e = cands.find((x) => x.id === entry?.id) ?? cands.find((x) => x.storage_name === entry?.storage_name) ?? cands[0];
+    if (!e || r.total === null) return;
+    const units = fieldUnits(e);
+    const fields: Record<string, string> = Object.fromEntries(units.map((u) => [u, '']));
+    if (r.components.every((c) => units.includes(c.unit))) {
+      for (const c of r.components) fields[c.unit] = String((Number(fields[c.unit] || 0) + c.qty));
+    } else fields[e.inventory_unit] = r.total;
+    linesRef.current = { ...linesRef.current, [e.id]: { ...linesRef.current[e.id], fields } };
+    setLines((p) => ({ ...p, [e.id]: { ...p[e.id], fields, status: 'pending', message: undefined, conflict: undefined } }));
+    persist(e, fields);
+    setIndex(entries.indexOf(e));
+  }
+  const [scanMsg, setScanMsg] = useState<string | null>(null);
+  const [tool, setTool] = useState<'voice' | 'scan' | null>(null);
+  const scan = useCallback((code: string) => start(async () => {
+    setScanMsg(null);
+    const r = await lookupBarcode(code);
+    if (!r.ok) return setScanMsg(toMsg(r.error));
+    if (!r.data) return setScanMsg(`BARCODE NOT FOUND (${code}). A manager can add it on the Scan page.`);
+    const hit = r.data;
+    const e = entries.find((x) => x.product_id === hit.product_id && x.storage_name === entry?.storage_name) ?? entries.find((x) => x.product_id === hit.product_id);
+    if (!e) return setScanMsg(`${hit.name} is not on this count sheet. Use “+ Item not on the sheet”.`);
+    saveNow();
+    setIndex(entries.indexOf(e));
+    setTool(null);
+  }), [entries, entry?.storage_name, toMsg]); // eslint-disable-line react-hooks/exhaustive-deps
+  const voiceProducts = useMemo<VoiceProduct[]>(() => {
+    const seen = new Map<string, VoiceProduct>();
+    for (const e of entries) if (!seen.has(e.product_id)) seen.set(e.product_id, { id: e.product_id, name: e.product_name, item_code: e.item_code, inventory_unit: e.inventory_unit, conversions: e.conversions });
+    return [...seen.values()];
+  }, [entries]);
+
   function saveNow() {
     scheduleFlush(0);
   }
@@ -393,6 +433,13 @@ export function CountSheet({ sheet }: { sheet: Sheet }) {
               })}
             </ul>
           </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant={tool === 'voice' ? 'primary' : 'secondary'} onClick={() => setTool(tool === 'voice' ? null : 'voice')} disabled={!!locked}>VOICE COUNT</Button>
+            <Button variant={tool === 'scan' ? 'primary' : 'secondary'} onClick={() => setTool(tool === 'scan' ? null : 'scan')}>SCAN BARCODE</Button>
+          </div>
+          {tool === 'voice' && <VoiceCount products={voiceProducts} units={unitsList} current={voiceProducts.find((p) => p.id === entry.product_id) ?? null} onUse={applyVoice} />}
+          {tool === 'scan' && <div className="rounded-2xl border border-slate-200 bg-white p-3"><BarcodeScanner onCode={scan} busy={pending} /></div>}
+          {scanMsg && <Alert tone="warn">{scanMsg}</Alert>}
           {adding ? (
             <AddItem sessionId={sessionId} areaId={entry.storage_location_id} onDone={() => { setAdding(false); router.refresh(); }} />
           ) : <Button variant="secondary" className="w-full" onClick={() => setAdding(true)} disabled={!online}>+ Item not on the sheet</Button>}

@@ -12,10 +12,12 @@ export interface NavItem {
 export const SIDEBAR: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', any: [] },
   { href: '/search', label: 'Search', any: [], managementOnly: true },
+  { href: '/scan', label: 'Scan barcode', any: [] },
   { href: '/inventory', label: 'Inventory', any: ['inventory.view'] },
   { href: '/counts', label: 'Counts', any: ['counts.perform', 'counts.post'] },
   { href: '/receiving', label: 'Receiving', any: ['receiving.review'] },
   { href: '/ordering', label: 'Ordering', any: ['orders.manage'] },
+  { href: '/forecast', label: 'Forecast', any: ['orders.manage', 'sales.enter', 'reports.financial'], managementOnly: true },
   { href: '/commissary', label: 'Commissary', any: ['commissary.manage', 'production.record'], managementOnly: true },
   { href: '/recipes', label: 'Recipes', any: ['recipes.manage'], managementOnly: true },
   { href: '/sales', label: 'Sales', any: ['sales.enter'], managementOnly: true },
@@ -43,6 +45,7 @@ export const EMPLOYEE_BOTTOM: NavItem[] = [
   { href: '/receiving/new', label: 'Receive', any: ['receiving.perform'] },
   { href: '/waste', label: 'Waste', any: ['waste.log'] },
   { href: '/tasks', label: 'Tasks', any: ['tasks.view'] },
+  { href: '/scan', label: 'Scan', any: [] },
 ];
 
 export function visible(items: NavItem[], ctx: AppContext): NavItem[] {

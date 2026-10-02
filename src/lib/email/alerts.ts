@@ -20,7 +20,7 @@ export { ALERT_CATEGORIES, type AlertCategory };
 const TYPE_CATEGORY: Record<string, AlertCategory> = {
   HIGH_WASTE: 'waste', HIGH_INVENTORY_VARIANCE: 'variance', DELIVERY_DISCREPANCY: 'delivery', COMMISSARY_DIFFERENCE: 'delivery',
   TRANSFER_DIFFERENCE: 'delivery', INVOICE_PHOTO_MISSING: 'delivery', PRICE_INCREASE: 'price', EMPLOYEE_PIN_LOCKED: 'security',
-  SUSPICIOUS_PIN_ACTIVITY: 'security', POS_SYNC_FAILED: 'sync_failure',
+  SUSPICIOUS_PIN_ACTIVITY: 'security', POS_SYNC_FAILED: 'sync_failure', ANOMALY: 'anomaly',
 };
 
 interface AlertEvent { ref: string; category: AlertCategory; title: string; message: string; link: string | null; at: string }

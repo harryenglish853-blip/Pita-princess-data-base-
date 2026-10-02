@@ -105,6 +105,23 @@ sends the count back to review. Posted counts are locked by trigger.
 * Supabase session cookies and the employee cookie are `httpOnly`, `SameSite=Lax`, `Secure` in
   production. Security headers: frame-deny, nosniff, HSTS, no-index.
 
+## Phase 8: forecasting, invoice reading, barcodes, voice, anomalies
+
+* **Forecast** (`app.forecast_items`): per menu item per day = same-weekday average over the last 56 days (open days
+  only, n ≥ 2) × trend (last 14 / prior 14 days, clamped 0.8–1.25) × product of matching `forecast_adjustments`.
+  `app.forecast_product_usage` explodes it through the recipes into inventory units. `suggested_order` uses it for
+  dynamic-par items (method `sales_forecast`), else 28-day ledger usage, else the par.
+* **Invoice reading**: `request_invoice_extraction` (DB authorizes, needs an uploaded photo) → the server downloads the
+  files with the service key and calls Claude (`src/lib/ocr/invoice.ts`, structured output validated by Zod) →
+  `complete_invoice_extraction` (service role only) stores the suggestion → a person runs `review_invoice_extraction`
+  (confirm / discard, audited). No function posts anything from a reading.
+* **Barcodes**: `product_barcodes` (one code → product + optional unit); `lookup_barcode` (any signed-in user),
+  `map_barcode` (`products.manage`, audited).
+* **Voice counts**: speech-to-text is the browser's; `src/lib/voice/parse.ts` turns text into product + quantities and
+  marks uncertain results, which the UI requires to be confirmed. Saving goes through the normal count autosave.
+* **Anomalies**: `app.detect_anomalies()` raises deduplicated `ANOMALY` alerts; run by the alerts cron
+  (`run_anomaly_checks_service`, service role) and on demand (`run_anomaly_checks`, `alerts.view`).
+
 ## Integration seams for later phases
 
 `vendors.integration_type` (manual/api/edi), `purchase_orders`, `invoice_documents.ocr_*`

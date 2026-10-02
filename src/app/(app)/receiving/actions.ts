@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { callRpc } from '@/lib/mutate';
 import { createStorageAdmin } from '@/lib/supabase/server';
+import { OCR_MODEL, OCR_PROVIDER, OcrError, ocrConfigured, readInvoice } from '@/lib/ocr/invoice';
 import type { ActionResult } from '@/lib/errors';
 
 const num = z.union([z.number().finite().min(0).max(100000), z.null()]);
@@ -118,4 +119,44 @@ export interface OpenOrder {
 export async function openOrders(vendorId: string): Promise<ActionResult<OpenOrder[]>> {
   if (!z.string().uuid().safeParse(vendorId).success) return { ok: false, error: { code: 'VALIDATION', message: 'Invalid vendor.' } };
   return callRpc<OpenOrder[]>('open_orders_for_receiving', { p_vendor_id: vendorId });
+}
+
+/**
+ * AI INVOICE CHECK: the database authorizes the request (receiving.review, an uploaded photo),
+ * the server reads the invoice files and stores the reading as a suggestion. Nothing is posted.
+ */
+export async function readInvoicePhotos(eventId: string): Promise<ActionResult<{ status: 'ready' | 'failed'; error?: string }>> {
+  if (!z.string().uuid().safeParse(eventId).success) return { ok: false, error: { code: 'VALIDATION', message: 'Missing delivery.' } };
+  if (!ocrConfigured()) return { ok: false, error: { code: 'VALIDATION', message: 'Invoice reading is not set up yet (the owner must add an ANTHROPIC_API_KEY).' } };
+  const req = await callRpc<string>('request_invoice_extraction', { p_receiving_event_id: eventId, p_provider: OCR_PROVIDER, p_model: OCR_MODEL });
+  if (!req.ok) return req;
+  const admin = createStorageAdmin();
+  let status: 'ready' | 'failed' = 'ready';
+  let extracted: unknown = null;
+  let error: string | null = null;
+  try {
+    const { data: docs, error: e } = await admin.from('invoice_documents').select('storage_bucket, storage_path, mime_type, file_name')
+      .eq('receiving_event_id', eventId).eq('upload_status', 'uploaded').order('uploaded_at');
+    if (e) throw e;
+    const files = await Promise.all((docs ?? []).slice(0, 10).map(async (d) => {
+      const { data, error: de } = await admin.storage.from(d.storage_bucket).download(d.storage_path);
+      if (de || !data) throw new OcrError(`Could not open ${d.file_name}.`);
+      return { mime: d.mime_type as string, name: d.file_name as string, data: Buffer.from(await data.arrayBuffer()) };
+    }));
+    extracted = await readInvoice(files);
+  } catch (e) {
+    status = 'failed';
+    error = e instanceof OcrError ? e.message : 'The invoice could not be read. Try again later.';
+    if (!(e instanceof OcrError)) console.error('[invoice reading]', (e as Error).message);
+  }
+  const { error: ce } = await admin.rpc('complete_invoice_extraction', { p_id: req.data, p_status: status, p_extracted: extracted, p_error: error });
+  if (ce) console.error('[invoice reading store]', ce.message);
+  revalidatePath(`/receiving/${eventId}`);
+  return { ok: true, data: { status, ...(error ? { error } : {}) } };
+}
+
+export async function reviewInvoiceReading(id: string, eventId: string, decision: 'confirmed' | 'discarded', note: string): Promise<ActionResult<null>> {
+  const r = await callRpc<null>('review_invoice_extraction', { p_id: id, p_decision: decision, p_note: note || null });
+  if (r.ok) revalidatePath(`/receiving/${eventId}`);
+  return r;
 }

@@ -6,7 +6,12 @@ export function WhyPanel({ s }: { s: SuggestionLine }) {
   const u = s.inventory_unit;
   const q = (v: number | null | undefined) => `${fmtQty(v ?? 0)} ${u}`;
   const rows: [string, string][] = [];
-  if (s.method === 'forecast') {
+  if (s.method === 'sales_forecast') {
+    rows.push(['Days this order must last', `${s.coverage_days} days (until the following delivery)`]);
+    for (const b of s.forecast_breakdown ?? []) rows.push([`  ${b.recipe} (${fmtQty(b.portions, 1)} forecast)`, q(b.usage)]);
+    rows.push(['Forecast usage (from the sales forecast)', q(s.forecast_usage)]);
+    rows.push(['+ Safety stock', q(s.safety_stock)]);
+  } else if (s.method === 'forecast') {
     rows.push(['Average daily usage', `${fmtQty(s.daily_usage, 2)} ${u}/day (last ${s.observed_days} days, ${q(s.usage_28_days)} used)`]);
     rows.push(['Days this order must last', `${s.coverage_days} days (until the following delivery)`]);
     rows.push(['Forecast usage', `${fmtQty(s.daily_usage, 2)} × ${s.coverage_days} = ${q(s.forecast_usage)}`]);
@@ -23,7 +28,7 @@ export function WhyPanel({ s }: { s: SuggestionLine }) {
   rows.push(['Short by', q(s.shortage)]);
   rows.push(['Pack size', `1 ${s.order_unit} = ${fmtQty(s.units_per_order_unit, 4)} ${u}`]);
   rows.push(['Suggested', `${fmtQty(s.shortage)} ÷ ${fmtQty(s.units_per_order_unit, 4)}, rounded up = ${fmtQty(s.suggested_qty)} ${s.order_unit}`]);
-  const why = s.method === 'forecast' ? 'Based on recent usage (dynamic par).' : s.method === 'par' ? 'Based on the par level.' : 'No par level and less than 7 days of history — set a par level.';
+  const why = s.method === 'sales_forecast' ? 'Based on the menu-item sales forecast (dynamic par).' : s.method === 'forecast' ? 'Based on recent usage (dynamic par).' : s.method === 'par' ? 'Based on the par level.' : 'No par level and less than 7 days of history — set a par level.';
   return (
     <details className="group rounded-lg bg-slate-50 px-3 py-2 text-sm">
       <summary className="cursor-pointer select-none font-bold text-brand">WHY? <span className="font-normal text-slate-600">{why}</span></summary>

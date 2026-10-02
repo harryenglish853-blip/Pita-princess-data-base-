@@ -71,8 +71,15 @@ unless explicitly overridden for staging, and always refuses when `APP_ENV=produ
    `TOAST_WEBHOOK_SECRET` (requests without a valid signature are rejected). `vercel.json` also pulls
    yesterday's and today's orders hourly via `/api/cron/pos`. Then an owner turns on Toast sync in
    **Toast POS** and maps the menu. Verify on staging with a real Toast sandbox before production.
-5. Production domain e.g. `inventory.<restaurant>.com`; HTTPS is automatic.
-6. Promote to production only a commit that passed the full quality gate on staging.
+5. AI invoice check (optional): create an Anthropic API key (console.anthropic.com) for the restaurant and set
+   `ANTHROPIC_API_KEY`. Without it the delivery page says the check is not set up; nothing else changes. The
+   reader uses `claude-opus-5-5` with server-side fallbacks enabled (if the model declines a request, the API
+   retries on its recommended fallback model). Photos are sent to Anthropic only when a manager presses
+   READ INVOICE; readings are suggestions only and are never posted.
+6. Anomaly checks run with the 10-minute alerts cron (`/api/cron/alerts`); thresholds are in Settings
+   (`anomaly.price_deviation_pct`, `anomaly.sales_low_pct`, `anomaly.min_amount`).
+7. Production domain e.g. `inventory.<restaurant>.com`; HTTPS is automatic.
+8. Promote to production only a commit that passed the full quality gate on staging.
 
 ## 4. Backups and restore
 

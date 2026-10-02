@@ -67,12 +67,12 @@ describe('suggested orders', () => {
     expect(Number(l.suggested_qty)).toBe(3);
   });
 
-  it('demo history: dynamic-par items forecast, static-par items use the par', async () => {
+  it('demo history: dynamic-par items use the sales forecast, static-par items use the par', async () => {
     const s = await suggest(I.vendor('SYSCO'));
     expect(s.items.length).toBeGreaterThan(0);
-    for (const i of s.items) expect(['forecast', 'par', 'none']).toContain(i.method);
-    // seeded demo history is 28 days, so dynamic-par demo items forecast
-    expect(line(s, I.product('P-CHKBR')).method).toBe('forecast');
+    for (const i of s.items) expect(['sales_forecast', 'forecast', 'par', 'none']).toContain(i.method);
+    // seeded demo sales cover 4 weeks, so dynamic-par items used by menu recipes order from the sales forecast
+    expect(line(s, I.product('P-CHKBR')).method).toBe('sales_forecast');
     expect(line(s, I.product('P-BACON')).method).toBe('par');
   });
 

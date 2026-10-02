@@ -10,5 +10,6 @@ export const ALERT_CATEGORIES = {
   order_reminder: 'Vendor order reminders',
   sync_failure: 'Failed Toast sync',
   security: 'Security (PIN lockouts)',
+  anomaly: 'Unusual activity (anomaly checks)',
 } as const;
 export type AlertCategory = keyof typeof ALERT_CATEGORIES;

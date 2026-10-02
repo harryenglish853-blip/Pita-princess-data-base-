@@ -1,10 +1,10 @@
 # Launch readiness report
 
-**Date:** 2026-10-01 · **Scope reviewed:** Phase 1 (foundation) + Phase 2 (core restaurant operations) + Phase 3 (suggested ordering) + Phase 4 (commissary) + Phase 5 (recipes & food cost) + Phase 6 (Toast) + Phase 7 (email reporting)
+**Date:** 2026-10-02 · **Scope reviewed:** Phase 1 (foundation) + Phase 2 (core restaurant operations) + Phase 3 (suggested ordering) + Phase 4 (commissary) + Phase 5 (recipes & food cost) + Phase 6 (Toast) + Phase 7 (email reporting) + Phase 8 (forecasting, invoice reading, barcode, voice counts, anomaly detection)
 
 ## Final recommendation: **NOT READY FOR PRODUCTION**
 
-Phases 1–7 are built and pass every automated test listed below. The system must still
+Phases 1–8 are built and pass every automated test listed below. The system must still
 **not** be used for real restaurant operations, because:
 
 1. It has only ever run against a **local** Supabase-equivalent stack (same Docker images
@@ -12,19 +12,21 @@ Phases 1–7 are built and pass every automated test listed below. The system mu
    **BLOCKED — REQUIRES EXTERNAL CONFIGURATION** (Supabase + Vercel accounts, domain).
 2. The owner acceptance checklist (real products, units, case sizes, costs, pars, vendors,
    URLs, employees, count order) has not been done.
-3. Phase 8 (advanced forecasting, OCR, barcode camera, voice counts, anomaly detection) is not built.
+3. Phase 8 invoice reading (AI OCR) has only run against a mock of the Claude API — **NOT YET VERIFIED** with a real
+   key and real invoice photos; **BLOCKED — REQUIRES EXTERNAL CONFIGURATION** (`ANTHROPIC_API_KEY`). Camera barcode
+   scanning and voice input depend on the browser and are **NOT YET VERIFIED** on real phones (the typed fallbacks are tested).
 4. The Toast integration has only run against a local mock of the Toast API. It is
    **NOT YET VERIFIED** against a real Toast account (credentials, exact field names, webhook
    signature format, rate limits) — **BLOCKED — REQUIRES EXTERNAL CONFIGURATION** (Toast API
    access for the restaurant).
 5. Backups/PITR and a restore drill can only be done on a real Supabase project.
 
-## Features completed (Phases 1–7)
+## Features completed (Phases 1–8)
 
 | Area | Status |
 |---|---|
 | Next.js 16 app, Tailwind, PWA manifest + service worker | Done |
-| Supabase schema: 17 migrations, RLS on every table, no `anon` access | Done |
+| Supabase schema: 18 migrations, RLS on every table, no `anon` access | Done |
 | 4 login roles; ONE shared employee login; employee profiles; hashed PINs; lockout; session switching; inactivity lock | Done |
 | Employee attribution on every operational record + audit log (login account AND employee) | Done |
 | Products, categories, storage areas, units, central conversion engine, vendors, vendor links | Done |
@@ -45,13 +47,19 @@ Phases 1–7 are built and pass every automated test listed below. The system mu
 | Toast POS: adapter (Toast → neutral orders), menu import, sales import (hourly cron + manual), signed webhook (HMAC, event dedupe), menu mapping with UNMAPPED items and AUTO-MATCH, re-posting earlier sales on mapping, sync log with errors; created / updated / duplicate / stale / voided / refunded / removed-item / quantity-change orders never double count; manual entry blocked on Toast days | Done against a mock Toast API — NOT YET VERIFIED with a real Toast account |
 | Email: per-recipient preferences (daily / weekly / monthly / commissary / alert categories), daily + weekly with sales and food cost, monthly owner report (MoM, best/worst weeks, turnover, price trends, top loss), immediate alert emails (thresholds, once per event per person, grouped, cooldown, claim-before-send so concurrent runs never double send), sent right after the action + 10-minute cron | Done (delivery via Resend: BLOCKED — REQUIRES EXTERNAL CONFIGURATION) |
 | Required invoice photo on every delivery (multi-page, direct upload to private storage, retry, "photo missing" alert until attached) | Done |
+| Sales forecast (Phase 8): per menu item per day = average of the same weekday over the last 8 weeks (open days only, at least 2) × recent trend (last 2 weeks vs the 2 before, limited to −20%…+25%) × manager adjustments for events / holidays / promotions (all items or one item); forecast screen with 7 days, forecast sales, ingredients the forecast will use vs on hand | Done |
+| Dynamic pars from the forecast: dynamic-par items order "forecast usage until the following delivery + safety stock" from the menu-item forecast through the recipes; WHY? lists the menu items behind it; falls back to 28-day usage, then par | Done |
+| AI invoice check (Phase 8): reads the invoice photos/PDF with Claude (structured output, server-side fallbacks), compares with what was recorded (by vendor item number, then name): quantity / price differences, lines not recorded, lines not on the invoice, different invoice number; a person CONFIRMS or DISCARDS; nothing is ever posted from a reading | Done against a mock — real reading NOT YET VERIFIED (needs `ANTHROPIC_API_KEY`) |
+| Barcode scanning: SCAN BARCODE (camera via the browser's BarcodeDetector; typed box that also works with handheld scanners) opens the item; unknown → BARCODE NOT FOUND, management maps it (with the unit one scan represents, audited); on the count sheet a scan jumps to the line | Done (camera: Chrome on Android; other browsers use the typed box) |
+| Voice counts: "Chicken breast, one case and eight pounds" → 1 CASE + 8 LB = 48 LB; number words, halves, digits; uses the current line when no product is said; uncertain results (unclear speech, close product matches, number without a unit, impossible unit) must be confirmed explicitly; nothing is filled until the person presses USE THIS COUNT; typed fallback | Done (speech recognition: Chrome / Safari) |
+| Anomaly detection: waste spike (yesterday > mean + 3 sd), delivery price ≥ 15% from the 90-day median, count difference > 3× usual, yesterday's sales < 50% of forecast (missing Toast data); raised once each as ANOMALY alerts, emailed to people who chose "Unusual activity"; runs every 10 minutes and on demand | Done |
 | Daily + weekly email reports with invoice photos attached; owner-managed recipients; preview, send now, history; hourly scheduler sends each period once | Done (delivery via Resend: BLOCKED — REQUIRES EXTERNAL CONFIGURATION) |
 
 ## Features intentionally deferred (clearly labeled in the app; no fake buttons)
 
-Phase 8
-advanced forecasting (seasonality, Toast sales, events), OCR, camera barcode scanning, voice counts. Sales come only from entered
-sales; with none, the tiles say so rather than showing invented numbers. Actual food cost uses
+Forecasting uses weekday patterns, the recent trend and manager adjustments; it does not model yearly seasonality
+(needs a year of history) or weather. Sales come only from Toast or entered sales; with none, the tiles say so rather
+than showing invented numbers. Actual food cost uses
 book inventory unless full counts are posted at the start and end of the period (the report says
 so). PDF export uses the
 browser's Print → Save as PDF.
@@ -61,15 +69,16 @@ browser's Print → Save as PDF.
 | Suite | Result |
 |---|---|
 | Lint (ESLint, Next rules) + TypeScript strict typecheck | Pass, 0 warnings |
-| Production build (`next build`) | Pass (44 routes) |
-| Unit tests (conversion engine vs shared fixtures, CSV escaping/formula injection, time-zone ranges incl. DST, vendor delivery/cutoff, order list text) | 41 / 41 pass (incl. order cutoff time, Toast order/menu normalizer) |
-| Database / integration tests against real Postgres 15 + Supabase roles (RLS, PIN security, attribution, ledger immutability, receiving/waste/transfer/count math, conversions in SQL, admin, vendor order log, invoice-photo alerts, email report content/attachments/recipients/duplicate-send, mock email provider) | 107 / 107 pass (incl. alert emails: only chosen categories, nothing from before a recipient existed, thresholds (small waste and minor price rises not emailed), stock announced once per drop, three concurrent dispatchers send once, cooldown groups alerts; daily/monthly report content; monthly recipients; server-only food cost; also Toast: created, duplicate, update (3 burgers = 1.5 LB, not 2.5), removed item, stale version, refund, void, late mapping posts once, not tracked, service-key only, sync off, manual entry blocked; also food cost: cheeseburger cost line by line = $3.5953 / 27.7%, a price change flowing through House Sauce into every sandwich, cycle rejection, 120 cheeseburgers × 8 OZ = 60 LB beef, repeat / change / void without double counting, unmapped items, actual = beginning + purchases − ending, permissions; also commissary: status flow, 95-of-100 receipt out 95 / in 95 with alert, production cost $29.25 / 20 QT = $1.4625, immutability, idempotency, permissions; also hand-verified suggested-order math: need 62 + 15 = 77, have 27 + 10 = 37, short 40 → 1 case of 40; par rounding; forged suggestion ignored; overrides audited; employees refused) |
+| Production build (`next build`) | Pass |
+| Unit tests (conversion engine vs shared fixtures, CSV escaping/formula injection, time-zone ranges incl. DST, vendor delivery/cutoff, order list text) | 48 / 48 pass (incl. order cutoff time, Toast order/menu normalizer, voice parser: "one case and eight pounds" = 48 LB, "a case and a half", number words, uncertainty rules; invoice reader against a mock Claude API: request shape, refusal, unsupported files, missing key; invoice vs recorded comparison) |
+| Database / integration tests against real Postgres 15 + Supabase roles (RLS, PIN security, attribution, ledger immutability, receiving/waste/transfer/count math, conversions in SQL, admin, vendor order log, invoice-photo alerts, email report content/attachments/recipients/duplicate-send, mock email provider) | 114 / 114 pass (incl. Phase 8: forecast recomputed independently from raw sales, adjustments ×1.5 and removal, permissions, dynamic-par suggestion = forecast usage + safety stock with its menu-item breakdown, barcode lookup / map permissions / unit validation / audit, invoice reading needs a photo, server-only result storage, review confirms without changing inventory, anomaly checks find a crafted waste spike / price jump / missing sales exactly once; alert emails: only chosen categories, nothing from before a recipient existed, thresholds (small waste and minor price rises not emailed), stock announced once per drop, three concurrent dispatchers send once, cooldown groups alerts; daily/monthly report content; monthly recipients; server-only food cost; also Toast: created, duplicate, update (3 burgers = 1.5 LB, not 2.5), removed item, stale version, refund, void, late mapping posts once, not tracked, service-key only, sync off, manual entry blocked; also food cost: cheeseburger cost line by line = $3.5953 / 27.7%, a price change flowing through House Sauce into every sandwich, cycle rejection, 120 cheeseburgers × 8 OZ = 60 LB beef, repeat / change / void without double counting, unmapped items, actual = beginning + purchases − ending, permissions; also commissary: status flow, 95-of-100 receipt out 95 / in 95 with alert, production cost $29.25 / 20 QT = $1.4625, immutability, idempotency, permissions; also hand-verified suggested-order math: need 62 + 15 = 77, have 27 + 10 = 37, short 40 → 1 case of 40; par rounding; forged suggestion ignored; overrides audited; employees refused) |
 | Browser E2E — full demo flow, phone size (steps 1–25 and 28 below) | 9 / 9 pass |
 | Browser E2E — log a Sysco order (copy list, open website link, log as placed) then employee receives against it with an invoice photo; VIEW SUGGESTED ORDER prefill, WHY?, override, both numbers stored | 3 / 3 pass |
 | Browser E2E — commissary: create + submit (email logged to the commissary recipient with VIEW ORDER), accept / prepare / ready / send, Carlos receives 95 of 100 on the shared login, differences shown, production batch pre-fill and cost | 4 / 4 pass |
 | Browser E2E — Toast (mock API): owner turns sync on, menu import, auto-match, not tracked, sales import with one UNMAPPED item, mapping posts it, re-sync adds nothing, signed webhook update + bad signature + redelivery, older version ignored | 4 / 4 pass |
 | Browser E2E — recipes (cost and %, new menu item with a sub-recipe), daily sales entry posting usage once, owner food cost report with drilldowns and CSV, management refused | 4 / 4 pass |
 | Browser E2E — photo required before submit, 2-page invoice upload, owner adds company + manager emails, report preview lists the photos, send-now, scheduler rejects callers without the secret | included in demo flow (10 tests) |
+| Browser E2E — forecast screen + adjustment, forecast-driven WHY?, barcode not found (employee) → mapped by a manager → opens the item, voice count fills 48 LB only after confirmation, uncertain result needs explicit confirmation, scan jumps to a count line, AI invoice check marked not set up, anomaly checks on demand | 5 / 5 pass |
 | Browser E2E — every page × owner / management / employee × phone 412px, tablet 820px, desktop 1440px: renders, no horizontal page scroll, no console errors, forbidden pages refused | 9 / 9 pass |
 
 Demo-flow coverage (spec numbering): 1–4 ✔ · 5–10 ✔ (short shipment, discrepancy, +160 LB only,
@@ -89,6 +98,7 @@ last-owner removal, self-demotion, privilege escalation attempts by management.
 
 | Severity | Bug | Fix |
 |---|---|---|
+| MEDIUM | Anomaly check for unusual prices failed with a type error (median is a floating-point value) — found by the new test | Median converted to numeric |
 | MEDIUM | After receiving a commissary order the result could vanish (the page re-rendered and said the order was no longer on its way) — intermittent | Receive screen keeps the order it opened with and its result |
 | MEDIUM | A product's stock alert could be emailed again on the next run (timestamp text format changed after the round trip) | Event key uses the numeric time |
 | HIGH (security) | Employee could complete a management-only task (`NOT (NULL OR …)` evaluated NULL) | NULL-safe check + test |
@@ -126,8 +136,14 @@ Critical bugs: **0** · High bugs: **0 open** (3 found and fixed).
   iPhone Safari / iPad Safari / Android Chrome devices: **NOT YET VERIFIED.**
 * **Offline counting:** Verified in Chromium (offline entry, reload, automatic sync, no
   duplicates). iOS Safari IndexedDB / PWA behavior: **NOT YET VERIFIED.**
-* **Email:** Daily/weekly reports built and verified against a mock email provider (recipients, subject, HTML, base64 invoice-photo attachments, no duplicate sends). Real delivery through Resend: **BLOCKED — REQUIRES EXTERNAL CONFIGURATION** (API key, verified sending domain, recipient addresses). Immediate alert emails and the monthly report: not built.
-* **Toast:** Not built (Phase 6). **BLOCKED — REQUIRES TOAST API ACCESS.**
+* **Email:** Daily / weekly / monthly reports and immediate alerts verified against a mock email provider. Real delivery through Resend: **BLOCKED — REQUIRES EXTERNAL CONFIGURATION** (API key, verified sending domain, recipient addresses).
+* **Toast:** Built and verified against a mock Toast API. Real account: **BLOCKED — REQUIRES TOAST API ACCESS.**
+* **Invoice reading (OCR):** Built; verified against a mock Claude API and in the database (review never posts anything).
+  Real reading quality on the restaurant's Sysco / Greco invoices: **NOT YET VERIFIED — BLOCKED — REQUIRES EXTERNAL
+  CONFIGURATION** (`ANTHROPIC_API_KEY`). Invoice photos are sent to Anthropic's API for reading when a manager presses READ INVOICE.
+* **Barcode camera / voice input:** Use the browser's built-in BarcodeDetector and speech recognition. Camera scanning
+  works in Chrome on Android, not in iPhone Safari (the typed box and handheld scanners work everywhere). Voice works in
+  Chrome and Safari; speech may be processed by the browser vendor. Real devices: **NOT YET VERIFIED.**
 * **Vendor workflow:** Manual (open website, copy list) works; vendor APIs/EDI not built by design.
 
 ## Manual calculation verification (performed by hand, matched system output)
@@ -148,7 +164,7 @@ Critical bugs: **0** · High bugs: **0 open** (3 found and fixed).
 ## Required before production (in order)
 
 1. Create staging Supabase + Vercel projects; apply migrations; re-run DB and E2E suites against staging; verify header forwarding and storage.
-2. Build and verify Phases 3–7 (at minimum those the restaurant needs on day one), each through the same test gate.
+2. Re-run the DB and E2E suites against staging; set `ANTHROPIC_API_KEY` and check AI invoice readings on 10+ real invoices before relying on them.
 3. Test on real devices (iPhone, iPad, Android) including offline counting in the walk-in.
 4. Enable PITR, run a restore drill, document results.
 5. Complete the owner acceptance checklist with real data on staging.

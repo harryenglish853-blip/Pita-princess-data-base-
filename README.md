@@ -6,7 +6,7 @@ and email reports. It is **not** a public site and **not** an app-store
 app: staff open a private URL on phones, tablets or computers and can add it to their
 home screen (PWA).
 
-> **Status: Phase 1 (foundation) and Phase 2 (core operations) are built and tested.
+> **Status: Phases 1–8 are built and tested against a local stack.
 > The system is NOT READY FOR PRODUCTION yet** — see
 > [docs/LAUNCH_READINESS_REPORT.md](docs/LAUNCH_READINESS_REPORT.md) for exactly what is
 > done, what is verified, and what is still required.
@@ -96,7 +96,20 @@ Carlos and Maria share one login.
   (BLOCKED — REQUIRES EXTERNAL CONFIGURATION until set); a local mock Toast API is used for tests.
   A day with Toast sales cannot also be entered by hand.
 
-Not built yet (clearly labeled in the app): forecasting / barcode camera / voice / OCR (Phase 8).
+- **Forecast** (Forecast screen): next 7 days per menu item (same weekday over the last 8 weeks ×
+  recent trend × your event / holiday adjustments), forecast sales, and the ingredients it will use.
+  Dynamic-par items order from it (WHY? shows the menu items behind the number).
+- **Barcode scanning** (Scan, and SCAN BARCODE on a count): camera where the browser supports it,
+  a typed box that also works with handheld scanners. Unknown codes show **BARCODE NOT FOUND**;
+  management maps them to a product (and the unit one scan is).
+- **Voice counts** (VOICE COUNT on a count): "Chicken breast, one case and eight pounds" →
+  1 CASE + 8 LB = 48 LB. Nothing is filled until the person presses USE THIS COUNT; unsure results
+  say what to check. Typing works too.
+- **AI invoice check** (delivery page): reads the invoice photo with Claude and lists differences from
+  what was recorded; a person confirms or discards. It never changes inventory. Needs
+  `ANTHROPIC_API_KEY` (BLOCKED — REQUIRES EXTERNAL CONFIGURATION until set).
+- **Anomaly detection**: unusual waste, prices, count differences and missing sales become alerts
+  (and emails for people who chose "Unusual activity"); runs every 10 minutes or on demand.
 
 ## Technology
 

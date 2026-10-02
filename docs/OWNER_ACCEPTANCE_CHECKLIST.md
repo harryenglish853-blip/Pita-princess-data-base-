@@ -63,7 +63,17 @@ Initial each line, with the date.
       the monthly report now and read it on a phone; log a large waste entry and confirm the alert email
       arrives once
 
-## Not yet available (do not plan operations around these)
-- [ ] Understood: advanced forecasting, invoice OCR, barcode camera and voice counts are a later phase (8)
+- [ ] Forecast: open Forecast; compare next week's numbers with what you expect; add an adjustment for a known event
+      and check that dynamic-par suggested orders go up
+- [ ] Barcodes: scan the case barcodes of your top 20 items (SCAN BARCODE on a phone, or a handheld scanner) and map each
+      unknown one to the right product and unit; scan again and check the item opens
+- [ ] Voice counts: in the walk-in, say "chicken breast, one case and eight pounds" and check 48 LB; try your own items
+- [ ] AI invoice check (only if ANTHROPIC_API_KEY is set): read 10 real invoices and compare with the paper; decide
+      whether the team may rely on it as a check (it never changes inventory)
+- [ ] Anomalies: choose who gets "Unusual activity" emails; review the thresholds in Settings
+
+## Limits to know
+- [ ] Understood: camera barcode scanning works in Chrome on Android (on iPhone use the typed box or a handheld
+      scanner); voice input needs Chrome or Safari; forecasts do not include yearly seasonality or weather
 
 Signed (Owner #1): ____________  Date: ______   Signed (Owner #2): ____________  Date: ______

@@ -8,13 +8,15 @@ export interface SuggestionLine {
   units_per_order_unit: number;
   vendor_sku: string | null;
   order_price: number | null;
-  method: 'forecast' | 'par' | 'none';
+  method: 'sales_forecast' | 'forecast' | 'par' | 'none';
   par_type: 'static' | 'dynamic';
   daily_usage: number;
   observed_days: number;
   usage_28_days: number;
   coverage_days: number;
   forecast_usage: number;
+  /** sales_forecast only: the menu items behind the expected usage */
+  forecast_breakdown?: { recipe: string; portions: number; usage: number }[] | null;
   safety_stock: number;
   par_level: number | null;
   need: number | null;

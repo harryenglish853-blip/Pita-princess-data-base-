@@ -1,8 +1,12 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { timingSafeEqual } from 'node:crypto';
 import { dispatchAlertEmails } from '@/lib/email/alerts';
+import { createStorageAdmin } from '@/lib/supabase/server';
 
-/** Safety net for immediate alert emails (they are also sent right after the action that caused them). Bearer CRON_SECRET only. */
+/**
+ * Runs the anomaly checks (each finding is raised once), then sends immediate alert emails
+ * (they are also sent right after the action that caused them). Bearer CRON_SECRET only.
+ */
 function authorized(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
   const got = req.headers.get('authorization') ?? '';
@@ -13,5 +17,7 @@ function authorized(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   if (!authorized(req)) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  return NextResponse.json(await dispatchAlertEmails());
+  const { data: anomalies, error } = await createStorageAdmin().rpc('run_anomaly_checks_service');
+  if (error) console.error('[anomaly checks]', error.message);
+  return NextResponse.json({ anomalies: error ? 'failed' : (anomalies as unknown[]).length, ...(await dispatchAlertEmails()) });
 }

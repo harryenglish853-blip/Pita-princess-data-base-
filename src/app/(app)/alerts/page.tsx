@@ -4,7 +4,7 @@ import { requirePermission } from '@/lib/auth/context';
 import { query } from '@/lib/data';
 import { fmtDateTime, humanize, DEFAULT_TZ } from '@/lib/format';
 import { Badge, Card, EmptyState, PageHeader, LinkButton } from '@/components/ui';
-import { AlertActions } from './AlertActions';
+import { AlertActions, RunChecksButton } from './AlertActions';
 
 export const metadata: Metadata = { title: 'Alerts' };
 
@@ -23,7 +23,7 @@ export default async function AlertsPage({ searchParams }: { searchParams: Promi
   return (
     <div className="mx-auto max-w-4xl">
       <PageHeader title="Alerts" subtitle={all ? 'All alerts' : 'Open and acknowledged alerts'}
-        actions={<LinkButton variant="secondary" href={all ? '/alerts' : '/alerts?show=all'}>{all ? 'Hide resolved' : 'Show resolved'}</LinkButton>} />
+        actions={<>{ctx.account.role !== 'employee' && <RunChecksButton />}<LinkButton variant="secondary" href={all ? '/alerts' : '/alerts?show=all'}>{all ? 'Hide resolved' : 'Show resolved'}</LinkButton></>} />
       {rows.length === 0 ? <EmptyState title="No alerts" /> : (
         <ul className="space-y-3">
           {rows.map((a) => (

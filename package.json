@@ -19,6 +19,7 @@
     "account:create": "tsx scripts/create-account.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.2",
     "decimal.js": "^10.6.0",
