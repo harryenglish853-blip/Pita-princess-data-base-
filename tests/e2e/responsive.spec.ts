@@ -7,7 +7,8 @@ test.beforeAll(() => resetDemo());
 
 const MANAGEMENT_PAGES = ['/dashboard', '/inventory', '/counts', '/receiving', '/receiving/new', '/ordering', '/vendors', '/waste', '/transfers',
   '/tasks', '/alerts', '/employees', '/reports', '/reports/waste', '/reports/deliveries', '/reports/price-history', '/reports/inventory-value',
-  '/reports/variance', '/reports/employee-activity', '/more', '/search?q=chick'];
+  '/reports/variance', '/reports/employee-activity', '/more', '/search?q=chick',
+  '/commissary', '/commissary/new', '/commissary/new?suggested=1', '/commissary/production', '/commissary/production/new'];
 const OWNER_ONLY = ['/admin', '/admin/settings', '/admin/accounts', '/admin/storage', '/admin/count-order', '/admin/catalog', '/admin/audit'];
 
 async function visitAll(page: import('@playwright/test').Page, paths: string[], shotPrefix: string, project: string) {
@@ -32,8 +33,9 @@ test('owner: every page', async ({ page }, info) => {
   const vendor = (await sql<{ id: string }>(`select id from vendors where code='SYSCO'`))[0].id;
   const employee = (await sql<{ id: string }>(`select id from employees where display_name='Carlos'`))[0].id;
   const count = (await sql<{ id: string }>(`select id from inventory_count_sessions limit 1`))[0].id;
+  const co = (await sql<{ id: string }>(`select id from commissary_orders limit 1`))[0].id;
   await visitAll(page, [...MANAGEMENT_PAGES, ...OWNER_ONLY, `/inventory/products/${product}`, `/inventory/products/${product}/edit`, '/inventory/products/new',
-    `/receiving/${receipt}`, `/vendors/${vendor}`, '/vendors/new', `/employees/${employee}`, `/counts/${count}`], 'owner', info.project.name);
+    `/receiving/${receipt}`, `/vendors/${vendor}`, '/vendors/new', `/employees/${employee}`, `/counts/${count}`, `/commissary/${co}`, `/commissary/${co}/receive`], 'owner', info.project.name);
   expect(errors).toEqual([]);
 });
 
@@ -54,7 +56,8 @@ test('employee (shared login + PIN): simple pages only', async ({ page }, info) 
   await page.screenshot({ path: `test-results/screens/${info.project.name}/employee_who.png`, fullPage: true });
   await pickEmployee(page, 'John', '1357');
   await expect(page.getByTestId('employee-name')).toHaveText('John');
-  await visitAll(page, ['/dashboard', '/receiving/new', '/waste', '/transfers', '/tasks'], 'employee', info.project.name);
+  const co = (await sql<{ id: string }>(`select id from commissary_orders limit 1`))[0].id;
+  await visitAll(page, ['/dashboard', '/receiving/new', '/waste', '/transfers', '/tasks', `/commissary/${co}/receive`], 'employee', info.project.name);
   for (const p of [...MANAGEMENT_PAGES.filter((x) => !['/dashboard', '/receiving/new', '/waste', '/transfers', '/tasks'].includes(x)), '/admin']) {
     await page.goto(p);
     await expect(page, p).toHaveURL(/\/(forbidden|dashboard)$/);

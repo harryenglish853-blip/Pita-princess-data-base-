@@ -6,7 +6,7 @@ import { addRecipient, updateRecipient, removeRecipient, sendReportNow } from '.
 import { useActionError } from '@/components/forms/useActionError';
 import { Alert, Button, Card, CardTitle, Input } from '@/components/ui';
 
-interface R { id: string; email: string; name: string | null; receives_daily: boolean; receives_weekly: boolean; is_active: boolean }
+interface R { id: string; email: string; name: string | null; receives_daily: boolean; receives_weekly: boolean; receives_commissary_orders: boolean; is_active: boolean }
 
 export function RecipientsEditor({ recipients }: { recipients: R[] }) {
   const toMsg = useActionError();
@@ -19,7 +19,7 @@ export function RecipientsEditor({ recipients }: { recipients: R[] }) {
   return (
     <Card className="space-y-3">
       <CardTitle>Who receives the reports</CardTitle>
-      <p className="text-sm text-slate-600">Add the company email and each manager&apos;s email. Recipients do not need a login to read the email; links inside open the private website.</p>
+      <p className="text-sm text-slate-600">Add the company email and each manager&apos;s email. Tick &ldquo;Commissary orders&rdquo; for whoever at the central kitchen must get each new commissary order. Recipients do not need a login to read the email; links inside open the private website.</p>
       {recipients.length === 0 && <p className="font-semibold text-amber-800">No recipients yet — reports are saved but go to nobody.</p>}
       <ul className="space-y-2">
         {recipients.map((r) => (
@@ -28,6 +28,7 @@ export function RecipientsEditor({ recipients }: { recipients: R[] }) {
             <span className="flex flex-wrap items-center gap-3 text-sm">
               <label className="flex items-center gap-1"><input type="checkbox" checked={r.receives_daily} disabled={pending} onChange={(e) => act(() => updateRecipient(r.id, { receives_daily: e.target.checked }) as never)} />Daily</label>
               <label className="flex items-center gap-1"><input type="checkbox" checked={r.receives_weekly} disabled={pending} onChange={(e) => act(() => updateRecipient(r.id, { receives_weekly: e.target.checked }) as never)} />Weekly</label>
+              <label className="flex items-center gap-1"><input type="checkbox" checked={r.receives_commissary_orders} disabled={pending} onChange={(e) => act(() => updateRecipient(r.id, { receives_commissary_orders: e.target.checked }) as never)} />Commissary orders</label>
               <Button size="sm" variant="ghost" disabled={pending} onClick={() => act(() => updateRecipient(r.id, { is_active: !r.is_active }) as never)}>{r.is_active ? 'Pause' : 'Resume'}</Button>
               <Button size="sm" variant="ghost" disabled={pending} onClick={() => window.confirm(`Remove ${r.email}?`) && act(() => removeRecipient(r.id) as never)}>Remove</Button>
             </span>

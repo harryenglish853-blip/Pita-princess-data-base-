@@ -15,7 +15,7 @@ const REPORTS = [
   { href: '/reports/employee-activity', title: 'Employee activity', desc: 'Who did what on the shared employee login — by person, not by login.', perm: 'employees.view_activity' },
   { href: '/admin/audit', title: 'Audit history', desc: 'Complete audit log including security and admin changes.', perm: 'audit.view' },
 ];
-const LATER = ['Actual vs theoretical food cost (Phase 5)', 'Food cost % and recipe cost (Phase 5)', 'Toast sales and sync status (Phase 6)', 'Commissary orders (Phase 4)', 'Monthly email report (Phase 7)'];
+const LATER = ['Actual vs theoretical food cost (Phase 5)', 'Food cost % and recipe cost (Phase 5)', 'Toast sales and sync status (Phase 6)', 'Monthly email report (Phase 7)'];
 
 export default async function ReportsPage() {
   const ctx = await requirePermission('reports.operational', 'reports.financial');

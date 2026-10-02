@@ -16,6 +16,7 @@ export const SIDEBAR: NavItem[] = [
   { href: '/counts', label: 'Counts', any: ['counts.perform', 'counts.post'] },
   { href: '/receiving', label: 'Receiving', any: ['receiving.review'] },
   { href: '/ordering', label: 'Ordering', any: ['orders.manage'] },
+  { href: '/commissary', label: 'Commissary', any: ['commissary.manage', 'production.record'], managementOnly: true },
   { href: '/vendors', label: 'Vendors', any: ['inventory.view'] },
   { href: '/waste', label: 'Waste', any: ['waste.log', 'waste.review'], managementOnly: true },
   { href: '/transfers', label: 'Transfers', any: ['transfers.perform'], managementOnly: true },

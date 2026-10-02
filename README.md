@@ -49,6 +49,15 @@ Carlos and Maria share one login.
   history) average daily usage × days until the following delivery + safety stock. Have = on hand +
   already ordered + transfers on the way. Every line has a WHY? breakdown; the system suggestion
   and the manager's quantity are both stored (computed on the server, never trusted from the browser).
+- **Commissary (central kitchen)**: NEW COMMISSARY ORDER (items, quantity, unit, needed date, notes;
+  suggested quantities available) → SUBMIT emails the order to the commissary recipients with a
+  VIEW ORDER link → statuses SUBMITTED, ACCEPTED, PREPARING, READY, IN TRANSIT, RECEIVED (or
+  CANCELLED with a reason), each with who and when. The commissary enters what it sent; the
+  restaurant (any employee on the shared login) confirms what arrived. Inventory moves only by what
+  was received (commissary out = restaurant in), and any shortage is flagged to management.
+- **Production**: record a batch (e.g. 20 QT Marinara from tomatoes, oil, onion). Ingredients leave
+  inventory; the finished product comes in at the cost of the ingredients used. The next batch
+  pre-fills from the last one (recipes in Phase 5 will fill it automatically).
 - Employee profile management (add, rename, reset PIN, deactivate — history kept)
 
 - **Invoice photos are required** for every delivery (by hand or against a logged order); several
@@ -58,8 +67,7 @@ Carlos and Maria share one login.
   credit due, **invoice photos attached**, orders logged, waste, low stock, price changes, counts,
   employee activity, open alerts. Preview / send now / history in Administration → Email reports.
 
-Not built yet (clearly labeled in the app): commissary order forms
-& production (Phase 4), recipes and food cost (Phase 5), Toast integration (Phase 6), immediate alert emails and the monthly owner report (rest of Phase 7), forecasting / barcode camera / voice / OCR (Phase 8).
+Not built yet (clearly labeled in the app): recipes and food cost (Phase 5), Toast integration (Phase 6), immediate alert emails and the monthly owner report (rest of Phase 7), forecasting / barcode camera / voice / OCR (Phase 8).
 
 ## Technology
 

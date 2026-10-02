@@ -14,7 +14,7 @@ export default async function EmailAdminPage() {
   const ctx = await requirePermission('email.manage');
   const tz = ctx.organization?.timezone ?? DEFAULT_TZ;
   const [recipients, reports, settings] = await Promise.all([
-    query<{ id: string; email: string; name: string | null; receives_daily: boolean; receives_weekly: boolean; is_active: boolean }[]>((s) => s.from('email_recipients').select('id, email, name, receives_daily, receives_weekly, is_active').order('created_at')),
+    query<{ id: string; email: string; name: string | null; receives_daily: boolean; receives_weekly: boolean; receives_commissary_orders: boolean; is_active: boolean }[]>((s) => s.from('email_recipients').select('id, email, name, receives_daily, receives_weekly, receives_commissary_orders, is_active').order('created_at')),
     query<{ id: string; report_type: string; period_start: string; period_end: string; triggered_by: string; status: string; recipients: string[]; subject: string; attachments: { attached: boolean }[]; error: string | null; created_at: string }[]>((s) =>
       s.from('email_reports').select('id, report_type, period_start, period_end, triggered_by, status, recipients, subject, attachments, error, created_at').order('created_at', { ascending: false }).limit(30)),
     query<{ key: string; value: number }[]>((s) => s.from('settings').select('key, value').in('key', ['email.daily_report_hour', 'email.weekly_report_day'])),

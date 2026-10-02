@@ -7,6 +7,7 @@ import { fmtMoney, fmtDate, fmtTime, todayInTz, DEFAULT_TZ } from '@/lib/format'
 import { Card, CardTitle, LinkButton, PageHeader, Stat, Badge } from '@/components/ui';
 import { AttentionList } from '@/components/dashboard/AttentionList';
 import { endEmployeeSession } from '@/lib/auth/actions';
+import { IncomingCommissary } from '@/components/commissary/IncomingCommissary';
 
 export const metadata: Metadata = { title: 'Home' };
 const switchEmployee = endEmployeeSession.bind(null, 'switched');
@@ -27,6 +28,7 @@ async function EmployeeHome({ ctx }: { ctx: AppContext }) {
         <p className="font-semibold uppercase tracking-wide text-slate-500">Restaurant operations</p>
       </div>
       <div className="grid gap-3">
+        {can(ctx, 'receiving.perform') && <IncomingCommissary />}
         <LinkButton href="/receiving/new" size="xl">RECEIVE DELIVERY</LinkButton>
         <LinkButton href="/waste" size="xl">LOG WASTE</LinkButton>
         <LinkButton href="/transfers" size="xl">TRANSFER PRODUCT</LinkButton>
@@ -52,11 +54,13 @@ async function ManagerDashboard({ ctx }: { ctx: AppContext }) {
   return (
     <div>
       <PageHeader title="Operations" subtitle={fmtDate(today)} />
+      {can(ctx, 'receiving.perform') && <div className="mb-4"><IncomingCommissary /></div>}
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {can(ctx, 'counts.perform') && <LinkButton href="/counts" size="xl">START INVENTORY</LinkButton>}
         <LinkButton href="/receiving/new" size="xl">RECEIVE DELIVERY</LinkButton>
         <LinkButton href="/waste" size="xl">LOG WASTE</LinkButton>
         {can(ctx, 'orders.manage') && <LinkButton href="/ordering" size="xl" variant="secondary">ORDERING CENTER</LinkButton>}
+        {can(ctx, 'commissary.manage') && <LinkButton href="/commissary" size="xl" variant="secondary">COMMISSARY</LinkButton>}
         <LinkButton href="/transfers" size="xl" variant="secondary">TRANSFERS</LinkButton>
         <LinkButton href="/reports" size="xl" variant="secondary">REPORTS</LinkButton>
         <LinkButton href="/tasks" size="xl" variant="secondary">TASKS</LinkButton>

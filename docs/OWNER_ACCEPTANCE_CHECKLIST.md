@@ -45,8 +45,13 @@ Initial each line, with the date.
 - [ ] Suggested orders: for each vendor, open VIEW SUGGESTED ORDER, tap WHY? on several lines and
       confirm the math matches what you would order (set dynamic par only on items with steady usage)
 
+- [ ] Commissary: mark the central kitchen's email for "Commissary orders" in Administration → Email
+      reports; submit a real commissary order, move it through the statuses, send it, receive it at
+      the restaurant with one item short, and check the alert and both locations' on-hand
+- [ ] Record one real production batch and check the finished-product cost
+
 ## Not yet available (do not plan operations around these)
-- [ ] Understood: commissary order forms, recipes/food cost, Toast sales,
+- [ ] Understood: recipes/food cost, Toast sales,
       immediate alert emails, monthly report, advanced forecasting, barcode camera and voice counts are later phases
 
 Signed (Owner #1): ____________  Date: ______   Signed (Owner #2): ____________  Date: ______

@@ -14,6 +14,7 @@ const recipient = z.object({
   name: z.string().trim().max(80),
   receives_daily: z.boolean(),
   receives_weekly: z.boolean(),
+  receives_commissary_orders: z.boolean().optional(),
 });
 
 export async function addRecipient(input: z.infer<typeof recipient>): Promise<ActionResult<null>> {
@@ -27,9 +28,9 @@ export async function addRecipient(input: z.infer<typeof recipient>): Promise<Ac
   return { ok: true, data: null };
 }
 
-export async function updateRecipient(id: string, patch: { receives_daily?: boolean; receives_weekly?: boolean; is_active?: boolean }): Promise<ActionResult<null>> {
+export async function updateRecipient(id: string, patch: { receives_daily?: boolean; receives_weekly?: boolean; receives_commissary_orders?: boolean; is_active?: boolean }): Promise<ActionResult<null>> {
   if (!z.string().uuid().safeParse(id).success) return { ok: false, error: { code: 'VALIDATION', message: 'Invalid recipient.' } };
-  const clean = Object.fromEntries(Object.entries(patch).filter(([k, v]) => ['receives_daily', 'receives_weekly', 'is_active'].includes(k) && typeof v === 'boolean'));
+  const clean = Object.fromEntries(Object.entries(patch).filter(([k, v]) => ['receives_daily', 'receives_weekly', 'receives_commissary_orders', 'is_active'].includes(k) && typeof v === 'boolean'));
   const s = await createSupabase();
   const { data, error } = await s.from('email_recipients').update(clean).eq('id', id).select('id');
   if (error) return { ok: false, error: toAppError(error) };

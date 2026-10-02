@@ -70,9 +70,14 @@ export default async function OrderingPage() {
                 {v.vendor_type === 'external' && v.ordering_url ? (
                   <a href={v.ordering_url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 items-center rounded-xl bg-brand px-5 font-bold text-white">OPEN {v.name.toUpperCase()} WEBSITE</a>
                 ) : v.vendor_type === 'external' ? <span className="text-sm text-amber-800">No ordering website set — add it on the vendor page.</span>
-                  : <span className="text-sm text-slate-600">Internal commissary: send product with Transfers. Commissary order forms arrive in Phase 4.</span>}
-                <LinkButton href={`/ordering/new?vendor=${v.id}&suggested=1`} size="lg">VIEW SUGGESTED ORDER</LinkButton>
-                <LinkButton href={`/ordering/new?vendor=${v.id}`} size="lg" variant="secondary">LOG AN ORDER</LinkButton>
+                  : <span className="text-sm text-slate-600">Internal commissary: the order goes straight to the central kitchen (by email) and is tracked until it arrives.</span>}
+                {v.vendor_type === 'commissary' ? <>
+                  <LinkButton href="/commissary/new?suggested=1" size="lg">VIEW SUGGESTED ORDER</LinkButton>
+                  <LinkButton href="/commissary/new" size="lg" variant="secondary">NEW COMMISSARY ORDER</LinkButton>
+                </> : <>
+                  <LinkButton href={`/ordering/new?vendor=${v.id}&suggested=1`} size="lg">VIEW SUGGESTED ORDER</LinkButton>
+                  <LinkButton href={`/ordering/new?vendor=${v.id}`} size="lg" variant="secondary">LOG AN ORDER</LinkButton>
+                </>}
                 {low.length > 0 && <CopyList text={text} label="COPY LOW-STOCK LIST" />}
               </div>
             </Card>

@@ -248,6 +248,30 @@ begin
       0, 'SYSTEM_CORRECTION', 'Demo commissary opening stock', gen_random_uuid());
   end loop;
 
+  -- Commissary raw ingredients + one production batch + one order on its way ----
+  insert into public.location_products (location_id, product_id, par_level, min_level, reorder_level)
+  select v_ck, id, case item_code when 'P-TOMATO' then 75 when 'P-ONION' then 50 when 'P-OIL' then 6 else 100 end, null, null
+    from public.products where item_code in ('P-TOMATO', 'P-ONION', 'P-OIL', 'P-FLOUR');
+  for r in select id, item_code from public.products where item_code in ('P-TOMATO', 'P-ONION', 'P-OIL', 'P-FLOUR') loop
+    perform public.adjust_inventory(r.id, v_ck, case r.item_code when 'P-TOMATO' then 50 when 'P-ONION' then 25 when 'P-OIL' then 3 else 100 end,
+      0, 'SYSTEM_CORRECTION', 'Demo commissary opening stock', gen_random_uuid());
+  end loop;
+  perform public.record_production(jsonb_build_object('idempotency_key', gen_random_uuid(), 'location_id', v_ck,
+    'product_id', (select id from public.products where item_code = 'P-MARI'), 'quantity', 20, 'unit_code', 'QT',
+    'notes', 'Demo batch',
+    'ingredients', jsonb_build_array(
+      jsonb_build_object('product_id', (select id from public.products where item_code = 'P-TOMATO'), 'quantity', 16, 'unit_code', 'LB'),
+      jsonb_build_object('product_id', (select id from public.products where item_code = 'P-OIL'), 'quantity', 0.5, 'unit_code', 'GAL'),
+      jsonb_build_object('product_id', (select id from public.products where item_code = 'P-ONION'), 'quantity', 2, 'unit_code', 'LB'))));
+  v_res := public.save_commissary_order(jsonb_build_object('status', 'submitted',
+    'needed_date', (now() at time zone 'America/New_York')::date + 1, 'notes', 'Demo order',
+    'items', jsonb_build_array(
+      jsonb_build_object('product_id', (select id from public.products where item_code = 'P-DOUGH'), 'quantity', 2, 'unit_code', 'TRAY'),
+      jsonb_build_object('product_id', (select id from public.products where item_code = 'P-MEATB'), 'quantity', 2, 'unit_code', 'TRAY'))));
+  perform public.set_commissary_order_status((v_res ->> 'id')::uuid, 'accepted');
+  perform public.ship_commissary_order((v_res ->> 'id')::uuid,
+    (select jsonb_agg(jsonb_build_object('item_id', id, 'sent_quantity', quantity)) from public.commissary_order_items where order_id = (v_res ->> 'id')::uuid));
+
   -- Past deliveries (entered by management) -------------------------------------
   v_res := public.submit_receiving(jsonb_build_object(
     'idempotency_key', gen_random_uuid(), 'vendor_id', v_sysco, 'invoice_number', '1001882',
