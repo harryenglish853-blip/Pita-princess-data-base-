@@ -52,29 +52,46 @@ export async function submitReceiving(input: ReceivingInput): Promise<ActionResu
 
 const ALLOWED = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'application/pdf'];
 
-export async function uploadInvoice(formData: FormData): Promise<ActionResult<{ document_id: string }>> {
-  const eventId = String(formData.get('receiving_event_id') ?? '');
-  const file = formData.get('file');
+/**
+ * Step 1 of an invoice photo upload: the database authorizes it (permission +
+ * verified employee) and records who is attaching it; the server then issues a
+ * one-time signed upload URL for exactly that file path in the private bucket.
+ * The browser uploads straight to storage (no request-size limits), then calls
+ * confirmInvoiceUpload().
+ */
+export async function prepareInvoiceUpload(eventId: string, fileName: string, mimeType: string, size: number): Promise<ActionResult<{ document_id: string; upload_url: string }>> {
   if (!z.string().uuid().safeParse(eventId).success) return { ok: false, error: { code: 'VALIDATION', message: 'Missing delivery.' } };
-  if (!(file instanceof File) || file.size === 0) return { ok: false, error: { code: 'VALIDATION', message: 'Choose a photo or PDF.' } };
-  if (!ALLOWED.includes(file.type)) return { ok: false, error: { code: 'VALIDATION', message: 'Upload a photo (JPG, PNG, WEBP, HEIC) or a PDF.' } };
-  if (file.size > 15 * 1024 * 1024) return { ok: false, error: { code: 'VALIDATION', message: 'Files must be smaller than 15 MB.' } };
-
-  // 1) The database authorizes the upload and records who attached it.
+  if (!ALLOWED.includes(mimeType)) return { ok: false, error: { code: 'VALIDATION', message: 'Upload a photo (JPG, PNG, WEBP, HEIC) or a PDF.' } };
+  if (!Number.isInteger(size) || size <= 0 || size > 15 * 1024 * 1024) return { ok: false, error: { code: 'VALIDATION', message: 'Files must be smaller than 15 MB.' } };
   const reg = await callRpc<{ document_id: string; bucket: string; path: string }>('register_invoice_document', {
-    p_receiving_event_id: eventId, p_file_name: file.name, p_mime_type: file.type, p_size_bytes: file.size,
+    p_receiving_event_id: eventId, p_file_name: fileName.slice(0, 200), p_mime_type: mimeType, p_size_bytes: size,
   });
   if (!reg.ok) return reg;
-  // 2) Upload to the private bucket with the server-only key.
-  const storage = createStorageAdmin();
-  const { error } = await storage.storage.from(reg.data.bucket).upload(reg.data.path, file, { contentType: file.type, upsert: false });
-  await callRpc('mark_invoice_uploaded', { p_document_id: reg.data.document_id, p_success: !error });
-  if (error) {
-    console.error('[invoice upload failed]', error.message);
-    return { ok: false, error: { code: 'UNKNOWN', message: 'The invoice file could not be stored. The delivery itself was saved. Try the upload again.' } };
+  const { data, error } = await createStorageAdmin().storage.from(reg.data.bucket).createSignedUploadUrl(reg.data.path);
+  if (error || !data) {
+    console.error('[invoice upload url failed]', error?.message);
+    await callRpc('mark_invoice_uploaded', { p_document_id: reg.data.document_id, p_success: false });
+    return { ok: false, error: { code: 'UNKNOWN', message: 'Could not start the upload. Try again.' } };
   }
-  revalidatePath(`/receiving/${eventId}`);
-  return { ok: true, data: { document_id: reg.data.document_id } };
+  return { ok: true, data: { document_id: reg.data.document_id, upload_url: data.signedUrl } };
+}
+
+/** Step 2: verify the file really is in storage, then mark it uploaded (closes the missing-photo alert). */
+export async function confirmInvoiceUpload(documentId: string): Promise<ActionResult<null>> {
+  if (!z.string().uuid().safeParse(documentId).success) return { ok: false, error: { code: 'VALIDATION', message: 'Invalid upload.' } };
+  const admin = createStorageAdmin();
+  const { data: doc } = await admin.from('invoice_documents').select('storage_bucket, storage_path, receiving_event_id').eq('id', documentId).maybeSingle();
+  if (!doc) return { ok: false, error: { code: 'NOT_FOUND', message: 'Upload not found.' } };
+  const dir = doc.storage_path.slice(0, doc.storage_path.lastIndexOf('/'));
+  const name = doc.storage_path.slice(doc.storage_path.lastIndexOf('/') + 1);
+  const { data: files } = await admin.storage.from(doc.storage_bucket).list(dir, { search: name });
+  const present = (files ?? []).some((f) => f.name === name);
+  const r = await callRpc<null>('mark_invoice_uploaded', { p_document_id: documentId, p_success: present });
+  if (!r.ok) return r;
+  if (!present) return { ok: false, error: { code: 'UNKNOWN', message: 'The photo did not reach storage. Try again.' } };
+  revalidatePath(`/receiving/${doc.receiving_event_id}`);
+  revalidatePath('/dashboard');
+  return { ok: true, data: null };
 }
 
 export async function reviewReceiving(id: string, notes: string): Promise<ActionResult<null>> {

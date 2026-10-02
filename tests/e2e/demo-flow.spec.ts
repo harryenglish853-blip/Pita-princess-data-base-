@@ -68,15 +68,21 @@ test('5-10: Carlos receives a Sysco delivery with a short shipment', async ({ pa
   await page.getByLabel('Tomato invoiced').fill('2');
   await expectNoHorizontalOverflow(page);
 
+  // A photo of the invoice is required before the delivery can be submitted
+  await page.getByRole('button', { name: /SUBMIT DELIVERY/ }).click();
+  await expect(page.getByText('Take a photo of the invoice (or upload it) before submitting.')).toBeVisible();
+  const png = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c6360000002000154a24f5d0000000049454e44ae426082', 'hex');
+  await page.getByTestId('invoice-photo-input').setInputFiles([
+    { name: 'invoice-83923-p1.png', mimeType: 'image/png', buffer: png },
+    { name: 'invoice-83923-p2.png', mimeType: 'image/png', buffer: png },
+  ]);
+  await expect(page.getByText('Page 2: invoice-83923-p2.png')).toBeVisible();
+
   await page.getByRole('button', { name: /SUBMIT DELIVERY/ }).click();
   await expect(page.getByText(/Delivery saved — receipt #/)).toBeVisible();
   await expect(page.getByText(/DELIVERY DISCREPANCY \(2\)/)).toBeVisible();
   await expect(page.getByText('Possible credit due: $128.00')).toBeVisible();
-
-  // Invoice photo
-  const png = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c6360000002000154a24f5d0000000049454e44ae426082', 'hex');
-  await page.locator('input[type=file]').setInputFiles({ name: 'invoice-83923.png', mimeType: 'image/png', buffer: png });
-  await expect(page.getByText('✓ Attached invoice-83923.png')).toBeVisible();
+  await expect(page.getByText('Invoice photos: 2 of 2 uploaded')).toBeVisible();
 
   // Inventory increased only by what was actually received: 4 cases x 40 LB
   expect(await qty('P-CHKBR')).toBe(chickenBefore + 160);
@@ -89,8 +95,10 @@ test('5-10: Carlos receives a Sysco delivery with a short shipment', async ({ pa
   expect(audit[0]).toEqual({ summary: 'Carlos received Sysco delivery #83923 (2 items, 2 discrepancies)', account_name: 'Employee Shared Account', employee_name: 'Carlos' });
   const alert = await sql<{ status: string }>(`select status from alerts where alert_type='DELIVERY_DISCREPANCY' and title like '%83923%'`);
   expect(alert[0].status).toBe('open');
-  const doc = await sql<{ upload_status: string; employee_id: string }>(`select upload_status, employee_id from invoice_documents`);
-  expect(doc[0].upload_status).toBe('uploaded');
+  const doc = await sql<{ upload_status: string; employee: string }>(`select d.upload_status, e.display_name employee from invoice_documents d join employees e on e.id=d.employee_id join receiving_events re on re.id=d.receiving_event_id where re.invoice_number='83923'`);
+  expect(doc).toEqual([{ upload_status: 'uploaded', employee: 'Carlos' }, { upload_status: 'uploaded', employee: 'Carlos' }]);
+  const photoAlert = await sql<{ status: string }>(`select a.status from alerts a join receiving_events re on a.dedupe_key = 'invoice-photo:' || re.id where re.invoice_number='83923'`);
+  expect(photoAlert[0].status).toBe('resolved');
   expect(errors).toEqual([]);
 });
 
@@ -259,5 +267,32 @@ test('owner control center shows values derived from data; nothing invented', as
   const value = (await sql<{ v: string }>(`select round(sum(inventory_value),2) v from inventory_on_hand o join locations l on l.id=o.location_id where l.code='MAIN' and o.is_active`))[0].v;
   await expect(page.getByRole('link', { name: /Inventory value/ })).toContainText(`$${Number(value).toLocaleString('en-US', { minimumFractionDigits: 2 })}`);
   await expectNoHorizontalOverflow(page);
+  expect(errors).toEqual([]);
+});
+
+test('27: owner sets the company + manager emails; the weekly report includes the invoice photos', async ({ page, request }) => {
+  const errors = watchConsole(page);
+  await login(page, 'owner1@demo.local');
+  await page.goto('/admin/email');
+  await expect(page.getByText('Email sending is not set up yet')).toBeVisible();
+  for (const [email, name] of [['office@pitaprincess.test', 'Company'], ['manager@pitaprincess.test', 'Manager']]) {
+    await page.getByLabel('Recipient email').fill(email);
+    await page.getByLabel('Recipient name').fill(name);
+    await page.getByRole('button', { name: 'Add recipient' }).click();
+    await expect(page.getByText(email)).toBeVisible();
+  }
+  await page.goto('/admin/email/preview?type=weekly&current=1');
+  await expect(page.getByText(/would be attached: .*Sysco-83923-page1\.png/)).toBeVisible();
+  await page.goto('/admin/email');
+  page.once('dialog', (d) => d.accept());
+  await page.getByRole('button', { name: 'Send this week so far' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Saved (email sending not set up yet)' })).toBeVisible();
+  const row = (await sql<{ recipients: string[]; html: string; attachments: { filename: string }[] }>(`select recipients, html, attachments from email_reports order by created_at desc limit 1`))[0];
+  expect(row.recipients).toEqual(['office@pitaprincess.test', 'manager@pitaprincess.test']);
+  expect(row.html).toContain('Invoice #83923');
+  expect(row.html).toContain('Carlos');
+  // the scheduler endpoint rejects callers without the secret
+  expect((await request.get('/api/cron/reports')).status()).toBe(401);
+  expect((await request.get('/api/cron/reports', { headers: { authorization: 'Bearer wrong-secret-0000000000' } })).status()).toBe(401);
   expect(errors).toEqual([]);
 });

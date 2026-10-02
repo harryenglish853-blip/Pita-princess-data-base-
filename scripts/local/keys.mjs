@@ -23,6 +23,7 @@ SUPABASE_SERVICE_ROLE_KEY=${service}
 APP_URL=http://localhost:3000
 LOCAL_DB_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
 DEMO_PASSWORD=demo-password-123
+CRON_SECRET=local-cron-secret-0123456789abcdef
 `;
 fs.writeFileSync(new URL('../../.env.local', import.meta.url), env);
 console.log('wrote .env.local');

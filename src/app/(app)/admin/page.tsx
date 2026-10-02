@@ -6,10 +6,11 @@ import { PageHeader } from '@/components/ui';
 export const metadata: Metadata = { title: 'Administration' };
 
 export default async function AdminPage() {
-  const ctx = await requirePermission('settings.manage', 'products.manage', 'locations.manage', 'audit.view');
+  const ctx = await requirePermission('settings.manage', 'products.manage', 'locations.manage', 'audit.view', 'email.manage');
   const items = [
     { href: '/admin/settings', title: 'System settings', desc: 'Restaurant name, time zone, employee timeout, PIN lockout, recount and alert thresholds.', perm: 'settings.manage' },
     { href: '/admin/accounts', title: 'Login accounts & permissions', desc: 'Owner, management and the shared employee login. Passwords and what management may do.', perm: 'accounts.manage' },
+    { href: '/admin/email', title: 'Email reports', desc: 'Company and manager emails, daily and weekly reports with invoice photos.', perm: 'email.manage' },
     { href: '/admin/storage', title: 'Locations & storage areas', desc: 'Walk-in, freezer, dry storage… and their order.', perm: 'products.manage' },
     { href: '/admin/count-order', title: 'Count order (shelf-to-sheet)', desc: 'Arrange items in the exact order they sit on the shelves.', perm: 'products.manage' },
     { href: '/admin/catalog', title: 'Categories & units', desc: 'Product categories (food vs. non-food) and custom units.', perm: 'products.manage' },

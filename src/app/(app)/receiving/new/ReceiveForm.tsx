@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import type { Catalog, CatalogProduct } from '@/lib/types';
 import { allowedUnits, toInventoryQty, formatQty } from '@/lib/units/convert';
-import { submitReceiving, uploadInvoice, openOrders, type ReceivingResult, type OpenOrder } from '../actions';
+import { submitReceiving, openOrders, type ReceivingResult, type OpenOrder } from '../actions';
+import { uploadInvoiceFile } from '@/components/forms/invoiceUpload';
 import { ProductPicker } from '@/components/forms/ProductPicker';
 import { QtyInput, parseQty } from '@/components/forms/QtyInput';
 import { useActionError, newKey } from '@/components/forms/useActionError';
@@ -42,7 +43,7 @@ function linePreview(l: Line): string[] {
   return flags;
 }
 
-export function ReceiveForm({ catalog, today, actor, initialVendorId = null, initialOrderId = null }: { catalog: Catalog; today: string; actor: string; initialVendorId?: string | null; initialOrderId?: string | null }) {
+export function ReceiveForm({ catalog, today, actor, requirePhoto, initialVendorId = null, initialOrderId = null }: { catalog: Catalog; today: string; actor: string; requirePhoto: boolean; initialVendorId?: string | null; initialOrderId?: string | null }) {
   const toMsg = useActionError();
   const [vendorId, setVendorId] = useState<string | null>(initialVendorId);
   const [orders, setOrders] = useState<OpenOrder[]>([]);
@@ -56,6 +57,7 @@ export function ReceiveForm({ catalog, today, actor, initialVendorId = null, ini
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ReceivingResult | null>(null);
+  const [photos, setPhotos] = useState<File[]>([]);
   const [pending, start] = useTransition();
   const key = useRef(newKey());
 
@@ -106,6 +108,7 @@ export function ReceiveForm({ catalog, today, actor, initialVendorId = null, ini
     if (!vendor) return 'Choose the vendor.';
     if (vendor.vendor_type === 'external' && !invoice.trim()) return `Enter the invoice number from the ${vendor.name} invoice.`;
     if (lines.length === 0) return 'Add at least one item.';
+    if (requirePhoto && photos.length === 0) return 'Take a photo of the invoice (or upload it) before submitting.';
     for (const l of lines) {
       for (const [label, v] of [['Ordered', l.ordered], ['Received', l.received], ['Invoiced', l.invoiced], ['Rejected', l.rejected], ['Price', l.price]] as const) {
         const n = parseQty(v);
@@ -151,7 +154,7 @@ export function ReceiveForm({ catalog, today, actor, initialVendorId = null, ini
     });
   }
 
-  if (result) return <ReceiptDone result={result} vendorName={vendor?.name ?? ''} invoice={invoice} actor={actor} />;
+  if (result) return <ReceiptDone result={result} vendorName={vendor?.name ?? ''} invoice={invoice} actor={actor} photos={photos} requirePhoto={requirePhoto} />;
 
   if (!vendor) {
     return (
@@ -295,6 +298,26 @@ export function ReceiveForm({ catalog, today, actor, initialVendorId = null, ini
         })}
       </ul>
 
+      <Card className="space-y-2">
+        <p className="font-bold">Invoice photo {requirePhoto ? <span className="text-red-700">(required)</span> : '(optional)'}</p>
+        <p className="text-sm text-slate-600">Photograph every page of the {vendor.name} invoice. Photos are included in the management email reports.</p>
+        <label className="flex min-h-14 cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 font-semibold">
+          TAKE PHOTO / UPLOAD INVOICE
+          <input type="file" accept="image/*,application/pdf" capture="environment" multiple className="sr-only" data-testid="invoice-photo-input"
+            onChange={(e) => { const fs = Array.from(e.target.files ?? []); e.target.value = ''; setPhotos((p) => [...p, ...fs].slice(0, 10)); setError(null); }} />
+        </label>
+        {photos.length > 0 && (
+          <ul className="space-y-1">
+            {photos.map((f, i) => (
+              <li key={`${f.name}-${i}`} className="flex items-center justify-between gap-2 text-sm">
+                <span className="truncate">📄 Page {i + 1}: {f.name}</span>
+                <button type="button" className="text-slate-500" onClick={() => setPhotos((p) => p.filter((_, j) => j !== i))}>Remove</button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
       {error && <Alert title="Not submitted">{error}</Alert>}
       <div className="sticky bottom-20 z-10 lg:bottom-4">
         <Button size="xl" className="w-full shadow-lg" onClick={submit} disabled={pending || lines.length === 0}>
@@ -305,25 +328,30 @@ export function ReceiveForm({ catalog, today, actor, initialVendorId = null, ini
   );
 }
 
-function ReceiptDone({ result, vendorName, invoice, actor }: { result: ReceivingResult; vendorName: string; invoice: string; actor: string }) {
-  const toMsg = useActionError();
-  const [uploaded, setUploaded] = useState<string[]>([]);
-  const [err, setErr] = useState<string | null>(null);
-  const [pending, start] = useTransition();
+function ReceiptDone({ result, vendorName, invoice, actor, photos, requirePhoto }: { result: ReceivingResult; vendorName: string; invoice: string; actor: string; photos: File[]; requirePhoto: boolean }) {
+  type St = { file: File; status: 'uploading' | 'done' | 'failed'; message?: string };
+  const [items, setItems] = useState<St[]>(photos.map((file) => ({ file, status: 'uploading' })));
+  const started = useRef(false);
 
-  function onFile(f: File | undefined) {
-    if (!f) return;
-    const fd = new FormData();
-    fd.set('receiving_event_id', result.receiving_event_id);
-    fd.set('file', f);
-    setErr(null);
-    start(async () => {
-      const r = await uploadInvoice(fd).catch(() => null);
-      if (!r) return setErr('Upload failed — check the connection and try again.');
-      if (!r.ok) return setErr(toMsg(r.error));
-      setUploaded((u) => [...u, f.name]);
-    });
+  async function upload(i: number, file: File) {
+    setItems((xs) => xs.map((x, j) => (j === i ? { ...x, status: 'uploading', message: undefined } : x)));
+    const err = await uploadInvoiceFile(result.receiving_event_id, file);
+    setItems((xs) => xs.map((x, j) => (j === i ? { ...x, status: err ? 'failed' : 'done', message: err?.message } : x)));
   }
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    (async () => { for (let i = 0; i < photos.length; i++) await upload(i, photos[i]); })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  function addMore(fs: File[]) {
+    const base = items.length;
+    setItems((xs) => [...xs, ...fs.map((file) => ({ file, status: 'uploading' as const }))]);
+    (async () => { for (let k = 0; k < fs.length; k++) await upload(base + k, fs[k]); })();
+  }
+  const done = items.filter((x) => x.status === 'done').length;
+  const failed = items.some((x) => x.status === 'failed');
+  const busy = items.some((x) => x.status === 'uploading');
 
   return (
     <div className="mx-auto max-w-lg space-y-4">
@@ -339,19 +367,27 @@ function ReceiptDone({ result, vendorName, invoice, actor }: { result: Receiving
           <p className="mt-2">Management has been alerted.</p>
         </Alert>
       )}
-      <Card>
-        <p className="mb-2 font-bold">Invoice photo</p>
-        <label className="flex min-h-14 cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 font-semibold">
-          {pending ? 'Uploading…' : 'TAKE PHOTO / UPLOAD INVOICE'}
-          <input type="file" accept="image/*,application/pdf" capture="environment" className="sr-only" disabled={pending}
-            onChange={(e) => { onFile(e.target.files?.[0]); e.target.value = ''; }} />
+      <Card className="space-y-2">
+        <p className="font-bold">Invoice photo{items.length === 1 ? '' : 's'}: {done} of {items.length} uploaded</p>
+        {items.map((x, i) => (
+          <div key={i} className="flex items-center justify-between gap-2 text-sm">
+            <span className="truncate">Page {i + 1}: {x.file.name}</span>
+            {x.status === 'uploading' && <Badge tone="warn">Uploading…</Badge>}
+            {x.status === 'done' && <Badge tone="good">✓ Attached</Badge>}
+            {x.status === 'failed' && <Button size="sm" onClick={() => upload(i, x.file)}>RETRY</Button>}
+          </div>
+        ))}
+        {failed && <p className="text-sm font-semibold text-red-700">{items.find((x) => x.status === 'failed')?.message} The delivery is saved; management sees it as “invoice photo missing” until the photo is attached.</p>}
+        {requirePhoto && items.length === 0 && <p className="text-sm font-semibold text-red-700">No invoice photo attached.</p>}
+        <label className="flex min-h-12 cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 font-semibold">
+          + Add another page
+          <input type="file" accept="image/*,application/pdf" capture="environment" multiple className="sr-only"
+            onChange={(e) => { const fs = Array.from(e.target.files ?? []); e.target.value = ''; if (fs.length) addMore(fs); }} />
         </label>
-        {uploaded.map((n) => <p key={n} className="mt-2 text-sm text-emerald-700">✓ Attached {n}</p>)}
-        {err && <p className="mt-2 text-sm font-semibold text-red-700">{err}</p>}
       </Card>
       <div className="grid gap-2">
         {/* full reload resets the form state */}
-        <Button size="lg" onClick={() => window.location.reload()}>Receive another delivery</Button>
+        <Button size="lg" disabled={busy} onClick={() => window.location.reload()}>Receive another delivery</Button>
         <Link href="/dashboard" className="text-center font-semibold text-brand">Done</Link>
       </div>
     </div>

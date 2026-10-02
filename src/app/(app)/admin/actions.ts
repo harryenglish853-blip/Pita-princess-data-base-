@@ -28,6 +28,7 @@ const SETTING_LIMITS: Record<string, [number, number]> = {
   'employee.idle_timeout_minutes': [1, 120], 'employee.max_session_hours': [1, 24], 'employee.pin_max_attempts': [3, 10],
   'employee.pin_lock_minutes': [1, 240], 'employee.device_max_failures': [5, 100], 'counts.recount_variance_pct': [0, 100],
   'counts.recount_variance_value': [0, 100000], 'alerts.price_increase_pct': [0, 100], 'alerts.high_waste_value': [0, 100000],
+  'receiving.require_invoice_photo': [0, 1], 'email.daily_report_hour': [0, 23], 'email.weekly_report_day': [0, 6],
 };
 export async function saveSetting(key: string, value: number): Promise<ActionResult<null>> {
   const lim = SETTING_LIMITS[key];

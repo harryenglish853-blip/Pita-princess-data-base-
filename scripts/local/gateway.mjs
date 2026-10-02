@@ -10,9 +10,22 @@ const routes = [
   { prefix: '/storage/v1', port: 5000 },
 ];
 
+// Hosted Supabase's API gateway answers browser CORS for the storage API (used for
+// direct uploads to one-time signed URLs). Mirror that locally.
+const CORS = {
+  'access-control-allow-origin': '*',
+  'access-control-allow-methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
+  'access-control-allow-headers': 'authorization,apikey,content-type,x-upsert,x-client-info,cache-control',
+  'access-control-max-age': '3600',
+};
+
 http
   .createServer((req, res) => {
     const route = routes.find((r) => req.url.startsWith(r.prefix));
+    if (route?.prefix === '/storage/v1' && req.method === 'OPTIONS') {
+      res.writeHead(204, CORS).end();
+      return;
+    }
     if (!route) {
       res.writeHead(404).end('not found');
       return;
@@ -21,7 +34,7 @@ http
     const upstream = http.request(
       { host: '127.0.0.1', port: route.port, path, method: req.method, headers: { ...req.headers, host: `127.0.0.1:${route.port}` } },
       (up) => {
-        res.writeHead(up.statusCode ?? 502, up.headers);
+        res.writeHead(up.statusCode ?? 502, route.prefix === '/storage/v1' ? { ...up.headers, ...CORS } : up.headers);
         up.pipe(res);
       },
     );

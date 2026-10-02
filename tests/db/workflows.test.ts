@@ -138,8 +138,11 @@ describe('DEMO: Carlos receives a Sysco delivery with a short shipment', () => {
     const ds = (await db.query('select id from public.delivery_discrepancies where receiving_event_id = $1', [eventId])).rows;
     await expectFail(asUser(db, mgr(), (q) => q(`select public.resolve_discrepancy($1, 'resolved', '')`, [ds[0].id])), 'note');
     for (const d of ds) await asUser(db, mgr(), (q) => q(`select public.resolve_discrepancy($1, 'resolved', 'Credit memo received')`, [d.id]));
-    const alert = (await db.query(`select status from public.alerts where entity_id = $1`, [eventId])).rows[0];
+    const alert = (await db.query(`select status from public.alerts where alert_type = 'DELIVERY_DISCREPANCY' and entity_id = $1`, [eventId])).rows[0];
     expect(alert.status).toBe('resolved');
+    // no photo was attached in this database-level test, so the photo alert stays open
+    const photo = (await db.query(`select status from public.alerts where alert_type = 'INVOICE_PHOTO_MISSING' and entity_id = $1`, [eventId])).rows[0];
+    expect(photo.status).toBe('open');
   });
 
   it('a price increase records price history and raises a price alert', async () => {

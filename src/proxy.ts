@@ -6,7 +6,8 @@ import { createServerClient } from '@supabase/ssr';
  * except /login private. Authorization (roles, employee identity) is enforced
  * again in server code and, independently, in the database.
  */
-const PUBLIC_PATHS = ['/login', '/offline'];
+// /api/cron authenticates itself with CRON_SECRET (no user session).
+const PUBLIC_PATHS = ['/login', '/offline', '/api/cron'];
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });

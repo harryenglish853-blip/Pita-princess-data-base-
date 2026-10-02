@@ -58,8 +58,13 @@ unless explicitly overridden for staging, and always refuses when `APP_ENV=produ
 2. Environment variables (Production and Preview separately; **none** may start with
    `NEXT_PUBLIC_`): `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
    `APP_URL`, `APP_ENV` (`staging` / `production`).
-3. Production domain e.g. `inventory.<restaurant>.com`; HTTPS is automatic.
-4. Promote to production only a commit that passed the full quality gate on staging.
+3. Email reports: create a Resend account, verify the restaurant's sending domain, then set
+   `RESEND_API_KEY`, `EMAIL_FROM` and `CRON_SECRET` (random, 32+ characters). `vercel.json`
+   runs `/api/cron/reports` every hour (hourly crons need a Vercel Pro plan; on Hobby, change
+   the schedule to once a day after the report hour). The owner enters the company and manager
+   email addresses in **Administration → Email reports** and can preview or send a report there.
+4. Production domain e.g. `inventory.<restaurant>.com`; HTTPS is automatic.
+5. Promote to production only a commit that passed the full quality gate on staging.
 
 ## 4. Backups and restore
 

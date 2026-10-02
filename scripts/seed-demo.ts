@@ -13,6 +13,7 @@ import path from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 import { Client } from 'pg';
 import { loadEnv } from './lib/env';
+import { demoInvoicePng } from './lib/demoInvoice';
 
 loadEnv();
 
@@ -56,6 +57,23 @@ async function main() {
     throw e;
   } finally {
     await db.end();
+  }
+  // Demo invoice photos for the seeded deliveries (uploaded like the app does).
+  const db2 = new Client({ connectionString: dbUrl });
+  await db2.connect();
+  try {
+    const events = (await db2.query(`select re.id, re.account_id, re.vendor_id, re.delivery_date, coalesce(re.invoice_number, re.receipt_number::text) inv from receiving_events re`)).rows;
+    for (const ev of events) {
+      const docId = (await db2.query('select gen_random_uuid() id')).rows[0].id;
+      const storagePath = `${String(ev.delivery_date.toISOString?.() ?? ev.delivery_date).slice(0, 7).replace('-', '/')}/${ev.id}/${docId}.png`;
+      await db2.query(`insert into invoice_documents (id, receiving_event_id, vendor_id, storage_path, file_name, mime_type, size_bytes, account_id)
+                       values ($1, $2, $3, $4, $5, 'image/png', $6, $7)`, [docId, ev.id, ev.vendor_id, storagePath, `demo-invoice-${ev.inv}.png`, demoInvoicePng().length, ev.account_id]);
+      const { error } = await admin.storage.from('invoices').upload(storagePath, demoInvoicePng(), { contentType: 'image/png', upsert: true });
+      await db2.query(`update invoice_documents set upload_status = $2 where id = $1`, [docId, error ? 'failed' : 'uploaded']);
+      if (error) console.warn(`demo invoice upload failed (storage not running?): ${error.message}`);
+    }
+  } finally {
+    await db2.end();
   }
   console.log('demo data loaded. Accounts:', accounts.join(', '));
 }

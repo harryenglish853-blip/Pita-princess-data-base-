@@ -109,10 +109,22 @@ export default async function ReceivingDetail({ params }: { params: Promise<{ id
       <section>
         <CardTitle>Invoice files</CardTitle>
         <Card className="space-y-2">
-          {docs.length === 0 && <p className="text-slate-600">No invoice photo attached.</p>}
-          {docs.map((d) => (
-            <p key={d.id}>{d.url ? <a href={d.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-brand underline">{d.file_name}</a> : d.file_name} <span className="text-xs text-slate-500">{fmtDateTime(d.uploaded_at, tz)}</span></p>
-          ))}
+          {docs.length === 0 && <p className="font-semibold text-red-700">No invoice photo attached yet.</p>}
+          {docs.length > 0 && (
+            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {docs.map((d) => (
+                <li key={d.id} className="text-xs">
+                  {d.url ? (
+                    <a href={d.url} target="_blank" rel="noopener noreferrer" className="block">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL */}
+                      {d.mime_type.startsWith('image/') && d.mime_type !== 'image/heic' ? <img src={d.url} alt={`Invoice ${d.file_name}`} className="h-40 w-full rounded-lg border border-slate-200 object-cover" /> : <span className="flex h-40 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 font-semibold">Open {d.mime_type === 'application/pdf' ? 'PDF' : 'file'}</span>}
+                    </a>
+                  ) : <span>{d.file_name}</span>}
+                  <span className="mt-1 block truncate text-slate-500">{d.file_name} · {fmtDateTime(d.uploaded_at, tz)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
           <InvoiceUpload eventId={ev.id} />
           <p className="text-xs text-slate-500">Automatic invoice reading (OCR) is a planned future feature; amounts are never posted from a photo without confirmation.</p>
         </Card>

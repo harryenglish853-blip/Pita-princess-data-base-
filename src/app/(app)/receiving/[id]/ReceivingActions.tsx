@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { reviewReceiving, resolveDiscrepancy, uploadInvoice } from '../actions';
+import { reviewReceiving, resolveDiscrepancy } from '../actions';
+import { uploadInvoiceFile } from '@/components/forms/invoiceUpload';
 import { useActionError } from '@/components/forms/useActionError';
 import { Button, Input } from '@/components/ui';
 
@@ -59,13 +60,9 @@ export function InvoiceUpload({ eventId }: { eventId: string }) {
           const f = e.target.files?.[0];
           e.target.value = '';
           if (!f) return;
-          const fd = new FormData();
-          fd.set('receiving_event_id', eventId);
-          fd.set('file', f);
           start(async () => {
-            const r = await uploadInvoice(fd).catch(() => null);
-            if (!r) setErr('Upload failed — check the connection.');
-            else if (!r.ok) setErr(toMsg(r.error));
+            const e = await uploadInvoiceFile(eventId, f);
+            if (e) setErr(toMsg(e));
             else { setErr(null); router.refresh(); }
           });
         }} />

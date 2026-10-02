@@ -60,7 +60,9 @@ test('Carlos receives the delivery against the logged order (no prices shown to 
   await page.getByLabel('Chicken Breast received').fill('4');
   await page.getByRole('button', { name: /^French Fries/ }).click();
   await page.getByRole('button', { name: 'All arrived (4 CASE)' }).click();
+  await page.getByTestId('invoice-photo-input').setInputFiles({ name: 'invoice-77001.png', mimeType: 'image/png', buffer: Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c6360000002000154a24f5d0000000049454e44ae426082', 'hex') });
   await page.getByRole('button', { name: /SUBMIT DELIVERY/ }).click();
+  await expect(page.getByText('Invoice photo: 1 of 1 uploaded')).toBeVisible();
   await expect(page.getByText(/DELIVERY DISCREPANCY \(1\)/)).toBeVisible();
   await expect(page.getByText(/Chicken Breast: ordered 5 CASE, delivered 4/)).toBeVisible();
   const po = (await sql<{ status: string }>(`select status from purchase_orders`))[0];

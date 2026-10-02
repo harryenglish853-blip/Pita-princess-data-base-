@@ -46,9 +46,15 @@ Carlos and Maria share one login.
   Deliveries can be received against a logged order, so short/over shipments are caught.
 - Employee profile management (add, rename, reset PIN, deactivate — history kept)
 
+- **Invoice photos are required** for every delivery (by hand or against a logged order); several
+  pages per invoice; a delivery saved without one shows as "invoice photo missing" until fixed
+- **Email reports**: daily (previous day) and weekly (previous Sunday–Saturday) "everything" reports
+  to the company and manager emails the owner enters — deliveries, who received them, discrepancies,
+  credit due, **invoice photos attached**, orders logged, waste, low stock, price changes, counts,
+  employee activity, open alerts. Preview / send now / history in Administration → Email reports.
+
 Not built yet (clearly labeled in the app): suggested orders (Phase 3), commissary order forms
-& production (Phase 4), recipes and food cost (Phase 5), Toast integration (Phase 6), automated
-emails (Phase 7), forecasting / barcode camera / voice / OCR (Phase 8).
+& production (Phase 4), recipes and food cost (Phase 5), Toast integration (Phase 6), immediate alert emails and the monthly owner report (rest of Phase 7), forecasting / barcode camera / voice / OCR (Phase 8).
 
 ## Technology
 
