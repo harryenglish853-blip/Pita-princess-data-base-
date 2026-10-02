@@ -6,8 +6,8 @@ import { createServerClient } from '@supabase/ssr';
  * except /login private. Authorization (roles, employee identity) is enforced
  * again in server code and, independently, in the database.
  */
-// /api/cron authenticates itself with CRON_SECRET (no user session).
-const PUBLIC_PATHS = ['/login', '/offline', '/api/cron'];
+// /api/cron authenticates itself with CRON_SECRET; the Toast webhook with its HMAC signature (no user session).
+const PUBLIC_PATHS = ['/login', '/offline', '/api/cron', '/api/pos/toast/webhook'];
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });

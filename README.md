@@ -1,8 +1,8 @@
 # Restaurant Inventory — private operations website
 
 A private, mobile-first **website** (not an app-store app) for restaurant inventory, receiving, waste,
-transfers, physical counts, ordering, the commissary, recipes and food cost, daily sales and
-email reports (Toast POS import in a later phase). It is **not** a public site and **not** an app-store
+transfers, physical counts, ordering, the commissary, recipes and food cost, Toast POS sales
+and email reports. It is **not** a public site and **not** an app-store
 app: staff open a private URL on phones, tablets or computers and can add it to their
 home screen (PWA).
 
@@ -78,7 +78,18 @@ Carlos and Maria share one login.
   points, drill down by category, product (beginning / received / theoretical / waste / expected /
   ending / unexplained), menu item and day; CSV. The owner control center shows the same numbers.
 
-Not built yet (clearly labeled in the app): Toast integration (Phase 6), immediate alert emails and the monthly owner report (rest of Phase 7), forecasting / barcode camera / voice / OCR (Phase 8).
+- **Toast POS** (Toast POS screen): menu import, sales import (hourly + a SYNC SALES button) and a
+  signed webhook. Toast-specific code is only an adapter (`src/lib/pos/toast`) that turns Toast
+  orders into neutral POS orders; the database applies them generically. Each order/line is stored
+  once by its Toast id: repeated or older deliveries change nothing, updates replace (never add),
+  removed items, voids and quantity changes reverse the usage; refunds lower sales only. Every
+  Toast item is mapped to a recipe, marked "not tracked" (gift cards), or shown as **UNMAPPED
+  TOAST ITEM** with no usage posted until mapped — then its earlier sales are posted once.
+  AUTO-MATCH BY NAME, sync log with errors. Needs Toast API credentials
+  (BLOCKED — REQUIRES EXTERNAL CONFIGURATION until set); a local mock Toast API is used for tests.
+  A day with Toast sales cannot also be entered by hand.
+
+Not built yet (clearly labeled in the app): immediate alert emails and the monthly owner report (rest of Phase 7), forecasting / barcode camera / voice / OCR (Phase 8).
 
 ## Technology
 

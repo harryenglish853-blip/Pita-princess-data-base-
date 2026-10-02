@@ -9,7 +9,7 @@ const MANAGEMENT_PAGES = ['/dashboard', '/inventory', '/counts', '/receiving', '
   '/tasks', '/alerts', '/employees', '/reports', '/reports/waste', '/reports/deliveries', '/reports/price-history', '/reports/inventory-value',
   '/reports/variance', '/reports/employee-activity', '/more', '/search?q=chick',
   '/commissary', '/commissary/new', '/commissary/new?suggested=1', '/commissary/production', '/commissary/production/new',
-  '/recipes', '/recipes/new', '/sales'];
+  '/recipes', '/recipes/new', '/sales', '/pos'];
 const OWNER_ONLY = ['/reports/food-cost', '/reports/food-cost?view=product', '/reports/food-cost?view=recipe', '/reports/food-cost?view=day', '/admin', '/admin/settings', '/admin/accounts', '/admin/storage', '/admin/count-order', '/admin/catalog', '/admin/audit'];
 
 async function visitAll(page: import('@playwright/test').Page, paths: string[], shotPrefix: string, project: string) {

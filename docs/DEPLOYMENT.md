@@ -63,8 +63,14 @@ unless explicitly overridden for staging, and always refuses when `APP_ENV=produ
    runs `/api/cron/reports` every hour (hourly crons need a Vercel Pro plan; on Hobby, change
    the schedule to once a day after the report hour). The owner enters the company and manager
    email addresses in **Administration → Email reports** and can preview or send a report there.
-4. Production domain e.g. `inventory.<restaurant>.com`; HTTPS is automatic.
-5. Promote to production only a commit that passed the full quality gate on staging.
+4. Toast POS: ask Toast for API access for the restaurant (a Standard API machine client) and
+   set `TOAST_API_URL`, `TOAST_CLIENT_ID`, `TOAST_CLIENT_SECRET`, `TOAST_RESTAURANT_GUID`. In Toast,
+   add an orders webhook pointing to `https://<domain>/api/pos/toast/webhook` and set its secret as
+   `TOAST_WEBHOOK_SECRET` (requests without a valid signature are rejected). `vercel.json` also pulls
+   yesterday's and today's orders hourly via `/api/cron/pos`. Then an owner turns on Toast sync in
+   **Toast POS** and maps the menu. Verify on staging with a real Toast sandbox before production.
+5. Production domain e.g. `inventory.<restaurant>.com`; HTTPS is automatic.
+6. Promote to production only a commit that passed the full quality gate on staging.
 
 ## 4. Backups and restore
 

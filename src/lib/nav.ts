@@ -19,6 +19,7 @@ export const SIDEBAR: NavItem[] = [
   { href: '/commissary', label: 'Commissary', any: ['commissary.manage', 'production.record'], managementOnly: true },
   { href: '/recipes', label: 'Recipes', any: ['recipes.manage'], managementOnly: true },
   { href: '/sales', label: 'Sales', any: ['sales.enter'], managementOnly: true },
+  { href: '/pos', label: 'Toast POS', any: ['pos.manage'], managementOnly: true },
   { href: '/vendors', label: 'Vendors', any: ['inventory.view'] },
   { href: '/waste', label: 'Waste', any: ['waste.log', 'waste.review'], managementOnly: true },
   { href: '/transfers', label: 'Transfers', any: ['transfers.perform'], managementOnly: true },

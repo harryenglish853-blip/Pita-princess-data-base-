@@ -55,7 +55,7 @@ export default async function WasteReport({ searchParams }: { searchParams: Prom
         <Stat label="Waste cost" value={fmtMoney(total.toString())} />
         <Stat label="Entries" value={rows.length} />
         <Stat label="Waste % of sales" value={salesTotal.gt(0) ? `${total.div(salesTotal).mul(100).toFixed(1)}%` : '—'}
-          sub={salesTotal.gt(0) ? `of ${fmtMoney(salesTotal.toString())} sales` : 'No sales entered for this period'} />
+          sub={salesTotal.gt(0) ? `of ${fmtMoney(salesTotal.toString())} sales` : 'No sales for this period'} />
       </div>
       {rows.length === 0 ? <EmptyState title="No waste in this period" /> : (
         <div className="space-y-4">

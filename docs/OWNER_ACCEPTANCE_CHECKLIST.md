@@ -55,8 +55,12 @@ Initial each line, with the date.
 - [ ] Enter one real day of sales from the Toast product-mix report; check the ingredient usage on
       a few products and the food cost report after the next full count
 
+- [ ] Toast: get API access from Toast (Standard API machine client + webhook secret), set the
+      TOAST_* variables in Vercel, turn on Toast sync, SYNC MENU, map every item (or mark it not
+      tracked), SYNC SALES for yesterday and compare totals with Toast's sales summary
+
 ## Not yet available (do not plan operations around these)
-- [ ] Understood: Toast sales import,
+- [ ] Understood:
       immediate alert emails, monthly report, advanced forecasting, barcode camera and voice counts are later phases
 
 Signed (Owner #1): ____________  Date: ______   Signed (Owner #2): ____________  Date: ______

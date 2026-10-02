@@ -11,13 +11,14 @@ const REPORTS = [
   { href: '/reports/variance', title: 'Inventory variance & count history', desc: 'Book vs physical for posted counts; top losses.', perm: 'counts.post' },
   { href: '/reports/food-cost', title: 'Actual vs theoretical food cost', desc: 'Actual and theoretical cost $ and %, variance, by category, product, menu item and day.', perm: 'reports.financial' },
   { href: '/recipes', title: 'Recipe cost', desc: 'Cost per portion, food cost % and margin for every recipe, from current ingredient costs.', perm: 'recipes.manage' },
+  { href: '/pos', title: 'Toast sync status', desc: 'Toast menu mapping, unmapped items, sync log and errors.', perm: 'pos.manage' },
   { href: '/reports/waste', title: 'Waste', desc: 'Waste cost by product, reason, employee, category and day.', perm: 'waste.review' },
   { href: '/reports/deliveries', title: 'Deliveries, discrepancies & vendor spending', desc: 'Receipts, credits due and purchases by vendor.', perm: 'receiving.review' },
   { href: '/reports/price-history', title: 'Price history & price changes', desc: 'Every vendor price change with % change.', perm: 'inventory.view' },
   { href: '/reports/employee-activity', title: 'Employee activity', desc: 'Who did what on the shared employee login — by person, not by login.', perm: 'employees.view_activity' },
   { href: '/admin/audit', title: 'Audit history', desc: 'Complete audit log including security and admin changes.', perm: 'audit.view' },
 ];
-const LATER = ['Toast sales import and sync status (Phase 6)', 'Monthly email report (Phase 7)'];
+const LATER = ['Monthly email report (Phase 7)'];
 
 export default async function ReportsPage() {
   const ctx = await requirePermission('reports.operational', 'reports.financial');
