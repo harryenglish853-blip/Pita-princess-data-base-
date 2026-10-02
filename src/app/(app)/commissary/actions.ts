@@ -106,7 +106,18 @@ export async function recordProduction(input: ProductionInput): Promise<ActionRe
   return r;
 }
 
-export async function productionTemplate(productId: string): Promise<ActionResult<{ quantity: number; unit_code: string; ingredients: { product_id: string; quantity: number; unit_code: string }[] } | null>> {
+type Template = { source: 'recipe' | 'last_batch'; recipe_name?: string; quantity: number; unit_code: string; ingredients: { product_id: string; quantity: number; unit_code: string }[] };
+
+/** Ingredients to pre-fill a batch: from the product's prep recipe (scaled), else from the last batch. */
+export async function productionTemplate(productId: string, quantity?: number, unitCode?: string): Promise<ActionResult<Template | null>> {
   if (!uuid.safeParse(productId).success) return bad('Invalid product.');
-  return callRpc('last_production_template', { p_product_id: productId });
+  if (quantity !== undefined && !(Number.isFinite(quantity) && quantity > 0 && quantity <= 100000)) return bad('Invalid amount.');
+  if (unitCode !== undefined && !unit.safeParse(unitCode).success) return bad('Invalid unit.');
+  const fromRecipe = await callRpc<Omit<Template, 'source'> | null>('recipe_production_template',
+    { p_product_id: productId, p_quantity: quantity ?? null, p_unit: unitCode ?? null });
+  if (!fromRecipe.ok) return fromRecipe;
+  if (fromRecipe.data) return { ok: true, data: { ...fromRecipe.data, source: 'recipe' } };
+  const last = await callRpc<Omit<Template, 'source'> | null>('last_production_template', { p_product_id: productId });
+  if (!last.ok) return last;
+  return { ok: true, data: last.data ? { ...last.data, source: 'last_batch' } : null };
 }

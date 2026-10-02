@@ -166,51 +166,120 @@ begin
   v_alex := public.create_employee('Alex', 'E-104', '9173', 'Dishwasher', 'Kitchen');
   update public.employees set is_demo = true where id in (v_john, v_maria, v_carlos, v_alex);
 
+  -- Recipes (nested: House Sauce in burgers/sandwiches; Marinara made ahead) ----
+  declare
+    pid jsonb := (select jsonb_object_agg(item_code, id) from public.products);
+    v_sauce uuid; v_mari uuid;
+  begin
+    v_sauce := (public.save_recipe(jsonb_build_object('name', 'House Sauce', 'recipe_type', 'prep', 'yield_quantity', 64, 'yield_unit', 'FL_OZ',
+      'preparation_notes', 'Made to order each morning.', 'ingredients', jsonb_build_array(
+        jsonb_build_object('product_id', pid ->> 'P-CREAM', 'quantity', 1, 'unit_code', 'QT'),
+        jsonb_build_object('product_id', pid ->> 'P-BUTTER', 'quantity', 0.5, 'unit_code', 'LB'),
+        jsonb_build_object('product_id', pid ->> 'P-ONION', 'quantity', 4, 'unit_code', 'OZ'),
+        jsonb_build_object('product_id', pid ->> 'P-TOMATO', 'quantity', 1, 'unit_code', 'LB')))) ->> 'id')::uuid;
+    v_mari := (public.save_recipe(jsonb_build_object('name', 'Marinara', 'recipe_type', 'prep', 'yield_quantity', 20, 'yield_unit', 'QT',
+      'output_product_id', pid ->> 'P-MARI', 'preparation_notes', 'Commissary batch.', 'ingredients', jsonb_build_array(
+        jsonb_build_object('product_id', pid ->> 'P-TOMATO', 'quantity', 16, 'unit_code', 'LB'),
+        jsonb_build_object('product_id', pid ->> 'P-OIL', 'quantity', 0.5, 'unit_code', 'GAL'),
+        jsonb_build_object('product_id', pid ->> 'P-ONION', 'quantity', 2, 'unit_code', 'LB')))) ->> 'id')::uuid;
+    perform public.save_recipe(jsonb_build_object('name', 'Cheeseburger', 'recipe_type', 'menu', 'menu_item_name', 'Cheeseburger',
+      'yield_quantity', 1, 'yield_unit', 'EA', 'serving_size', '1 burger', 'selling_price', 12.99, 'ingredients', jsonb_build_array(
+        jsonb_build_object('product_id', pid ->> 'P-GRBEEF', 'quantity', 8, 'unit_code', 'OZ'),
+        jsonb_build_object('product_id', pid ->> 'P-BUNS', 'quantity', 1, 'unit_code', 'EA'),
+        jsonb_build_object('product_id', pid ->> 'P-CHED', 'quantity', 2, 'unit_code', 'SLICE'),
+        jsonb_build_object('sub_recipe_id', v_sauce, 'quantity', 1, 'unit_code', 'FL_OZ'),
+        jsonb_build_object('product_id', pid ->> 'P-LETTUCE', 'quantity', 1, 'unit_code', 'OZ'),
+        jsonb_build_object('product_id', pid ->> 'P-TOMATO', 'quantity', 2, 'unit_code', 'OZ'))));
+    perform public.save_recipe(jsonb_build_object('name', 'Chicken Sandwich', 'recipe_type', 'menu', 'yield_quantity', 1, 'yield_unit', 'EA',
+      'selling_price', 11.99, 'ingredients', jsonb_build_array(
+        jsonb_build_object('product_id', pid ->> 'P-CHKBR', 'quantity', 6, 'unit_code', 'OZ'),
+        jsonb_build_object('product_id', pid ->> 'P-AVO', 'quantity', 0.5, 'unit_code', 'EA'),
+        jsonb_build_object('product_id', pid ->> 'P-BUNS', 'quantity', 1, 'unit_code', 'EA'),
+        jsonb_build_object('sub_recipe_id', v_sauce, 'quantity', 1, 'unit_code', 'FL_OZ'),
+        jsonb_build_object('product_id', pid ->> 'P-LETTUCE', 'quantity', 1, 'unit_code', 'OZ'),
+        jsonb_build_object('product_id', pid ->> 'P-TOMATO', 'quantity', 1, 'unit_code', 'OZ'))));
+    perform public.save_recipe(jsonb_build_object('name', 'Margherita Pizza', 'recipe_type', 'menu', 'yield_quantity', 1, 'yield_unit', 'EA',
+      'selling_price', 14.99, 'ingredients', jsonb_build_array(
+        jsonb_build_object('product_id', pid ->> 'P-DOUGH', 'quantity', 1, 'unit_code', 'EA'),
+        jsonb_build_object('sub_recipe_id', v_mari, 'quantity', 4, 'unit_code', 'FL_OZ'),
+        jsonb_build_object('product_id', pid ->> 'P-MOZZ', 'quantity', 6, 'unit_code', 'OZ'))));
+    perform public.save_recipe(jsonb_build_object('name', 'Spaghetti & Meatballs', 'recipe_type', 'menu', 'yield_quantity', 1, 'yield_unit', 'EA',
+      'selling_price', 15.99, 'ingredients', jsonb_build_array(
+        jsonb_build_object('product_id', pid ->> 'P-MEATB', 'quantity', 4, 'unit_code', 'EA'),
+        jsonb_build_object('sub_recipe_id', v_mari, 'quantity', 6, 'unit_code', 'FL_OZ'))));
+    perform public.save_recipe(jsonb_build_object('name', 'French Fries', 'recipe_type', 'menu', 'yield_quantity', 1, 'yield_unit', 'EA',
+      'selling_price', 4.99, 'ingredients', jsonb_build_array(jsonb_build_object('product_id', pid ->> 'P-FRIES', 'quantity', 6, 'unit_code', 'OZ'))));
+    perform public.save_recipe(jsonb_build_object('name', 'Fountain Soda', 'recipe_type', 'menu', 'yield_quantity', 1, 'yield_unit', 'EA',
+      'selling_price', 2.49, 'ingredients', jsonb_build_array(jsonb_build_object('product_id', pid ->> 'P-COKE', 'quantity', 1, 'unit_code', 'EA'))));
+  end;
+
   -- Four weeks of demo history (so suggested orders can forecast) -----------------
-  -- Weekly receipts + daily sales usage, ending exactly at the opening-count
-  -- quantity below, so the opening count shows no variance. Busier Fri/Sat.
-  -- Products with par_type 'dynamic' order from this usage forecast.
+  -- Daily demo SALES through the recipes (busier Fri/Sat) post the ingredient usage;
+  -- weekly deliveries cover each week's usage and end exactly at the opening-count
+  -- quantities below, so the opening count shows no variance. Supplies (napkins,
+  -- to-go containers, gloves, sanitizer) have a simple daily usage. Food items no
+  -- menu recipe uses only get their opening stock.
   declare
     v_actor app.actor := row(v_mgr, 'manager', 'Management', null, null, null, null, null)::app.actor;
     v_today date := (now() at time zone 'America/New_York')::date;
-    v_day date;
-    v_use numeric;
-    v_week numeric;
+    v_start date := (now() at time zone 'America/New_York')::date - 28;
     v_whole boolean;
+    v_week numeric;
+    s record;
   begin
-    for r in
-      select p.id, p.item_code, p.inventory_unit, p.primary_vendor_id, p.current_cost, h.daily, h.target
-        from public.products p
-        join (values
-          ('P-CHKBR', 9, 60), ('P-GRBEEF', 6, 42), ('P-BACON', 2, 14), ('P-PEPP', 1.8, 12), ('P-SALMON', 1.2, 9),
-          ('P-CREAM', 1.5, 10), ('P-BUTTER', 2.2, 15), ('P-MOZZ', 4.5, 28), ('P-CHED', 2, 16), ('P-TOMATO', 3.5, 22),
-          ('P-LETTUCE', 2.6, 18), ('P-AVO', 7, 30), ('P-ONION', 3, 35), ('P-FRIES', 9, 75), ('P-BUNS', 14, 140),
-          ('P-OIL', 0.8, 6), ('P-FLOUR', 6, 80), ('P-RICE', 3, 32), ('P-DOUGH', 9, 90), ('P-MARI', 1.8, 14),
-          ('P-MEATB', 8, 60), ('P-COKE', 8, 110), ('P-SPRITE', 5, 60), ('P-NAPKIN', 300, 4500), ('P-TOGO', 25, 250),
-          ('P-GLOVES', 0.5, 4), ('P-SANI', 0.4, 3)
-        ) as h(code, daily, target) on h.code = p.item_code
-       order by p.item_code
-    loop
-      v_whole := r.inventory_unit in ('EA', 'BOX');
-      for w in 0..3 loop
-        -- this week's usage (days -28+7w .. -22+7w)
-        v_week := 0;
-        for i in 0..6 loop
-          v_day := v_today - 28 + 7 * w + i;
-          v_use := r.daily * case extract(dow from v_day) when 5 then 1.35 when 6 then 1.35 when 0 then 1.1 else 0.85 end;
-          v_week := v_week + case when v_whole then round(v_use) else round(v_use, 2) end;
-        end loop;
-        perform app.post_inventory_txn(v_actor, v_main, r.id, 'RECEIPT', v_week + case when w = 0 then r.target else 0 end,
-          r.current_cost, 'demo_history', null, ((v_today - 28 + 7 * w)::timestamp + interval '7 hours') at time zone 'America/New_York',
+    create temp table demo_sales on commit drop as
+      select d::date as day, rc.id as recipe_id, rc.name, rc.selling_price,
+             round(m.per_day * case extract(dow from d) when 5 then 1.35 when 6 then 1.35 when 0 then 1.1 else 0.85 end) as qty
+        from generate_series(v_start, v_today - 1, interval '1 day') d
+        cross join (values ('Cheeseburger', 12), ('Chicken Sandwich', 22), ('Margherita Pizza', 10), ('Spaghetti & Meatballs', 6),
+                           ('French Fries', 30), ('Fountain Soda', 25)) m(name, per_day)
+        join public.recipes rc on rc.name = m.name;
+    -- usage per product per week, rounded exactly like each posted sale line
+    create temp table demo_use on commit drop as
+      select x.product_id, (x.day - v_start) / 7 as w, sum(x.q) as q
+        from (select ds.day, e.product_id, round(sum(e.quantity_inv), 4) as q
+                from demo_sales ds cross join lateral app.recipe_explode(ds.recipe_id, ds.qty) e
+               group by ds.day, ds.recipe_id, e.product_id) x
+       group by 1, 2;
+    insert into demo_use
+      select p.id, (d::date - v_start) / 7,
+             sum(case when p.inventory_unit in ('EA', 'BOX') then round(h.daily * f.k) else round(h.daily * f.k, 2) end)
+        from generate_series(v_start, v_today - 1, interval '1 day') d
+        cross join lateral (select case extract(dow from d) when 5 then 1.35 when 6 then 1.35 when 0 then 1.1 else 0.85 end as k) f
+        cross join (values ('P-NAPKIN', 300), ('P-TOGO', 25), ('P-GLOVES', 0.5), ('P-SANI', 0.4)) h(code, daily)
+        join public.products p on p.item_code = h.code
+       group by 1, 2;
+
+    for wk in 0..3 loop
+      -- the week's delivery (first week also brings the stock the restaurant opens with)
+      for r in
+        select p.id, p.inventory_unit, p.primary_vendor_id, p.current_cost, h.target, coalesce(u.q, 0) as used
+          from public.products p
+          join (values
+            ('P-CHKBR', 60), ('P-GRBEEF', 42), ('P-BACON', 14), ('P-PEPP', 12), ('P-SALMON', 9), ('P-CREAM', 10), ('P-BUTTER', 15),
+            ('P-MOZZ', 28), ('P-CHED', 16), ('P-TOMATO', 22), ('P-LETTUCE', 18), ('P-AVO', 30), ('P-ONION', 35), ('P-FRIES', 75),
+            ('P-BUNS', 140), ('P-OIL', 6), ('P-FLOUR', 80), ('P-RICE', 32), ('P-DOUGH', 90), ('P-MARI', 14), ('P-MEATB', 60),
+            ('P-COKE', 110), ('P-SPRITE', 60), ('P-NAPKIN', 4500), ('P-TOGO', 250), ('P-GLOVES', 4), ('P-SANI', 3)
+          ) as h(code, target) on h.code = p.item_code
+          left join demo_use u on u.product_id = p.id and u.w = wk
+         order by p.item_code
+      loop
+        v_week := r.used + case when wk = 0 then r.target else 0 end;
+        continue when v_week <= 0;
+        perform app.post_inventory_txn(v_actor, v_main, r.id, 'RECEIPT', v_week,
+          r.current_cost, 'demo_history', null, ((v_start + 7 * wk)::timestamp + interval '7 hours') at time zone 'America/New_York',
           null, 'Demo history', r.primary_vendor_id, null, 'Demo delivery history');
-        for i in 0..6 loop
-          v_day := v_today - 28 + 7 * w + i;
-          v_use := r.daily * case extract(dow from v_day) when 5 then 1.35 when 6 then 1.35 when 0 then 1.1 else 0.85 end;
-          v_use := case when v_whole then round(v_use) else round(v_use, 2) end;
-          continue when v_use = 0;
-          perform app.post_inventory_txn(v_actor, v_main, r.id, 'POS_THEORETICAL_CONSUMPTION', -v_use, null, 'demo_history', null,
-            (v_day::timestamp + interval '22 hours') at time zone 'America/New_York', null, null, null, 'Demo sales usage', null);
-        end loop;
+      end loop;
+      -- the week's sales (theoretical usage through the recipes)
+      for s in select * from demo_sales where (day - v_start) / 7 = wk order by day, name loop
+        perform app.apply_sale(v_actor, 'demo', 'demo:' || s.day || ':' || s.recipe_id, s.day, s.name, s.recipe_id, s.qty,
+          round(s.qty * s.selling_price, 2), false);
+      end loop;
+      -- supplies used
+      for r in select u.product_id, u.q from demo_use u join public.products p on p.id = u.product_id
+                where u.w = wk and p.item_code in ('P-NAPKIN', 'P-TOGO', 'P-GLOVES', 'P-SANI') loop
+        perform app.post_inventory_txn(v_actor, v_main, r.product_id, 'MANUAL_ADJUSTMENT', -r.q, null, 'demo_history', null,
+          ((v_start + 7 * wk + 6)::timestamp + interval '22 hours') at time zone 'America/New_York', null, null, null, 'Demo supplies used', null);
       end loop;
     end loop;
   end;
@@ -271,6 +340,13 @@ begin
   perform public.set_commissary_order_status((v_res ->> 'id')::uuid, 'accepted');
   perform public.ship_commissary_order((v_res ->> 'id')::uuid,
     (select jsonb_agg(jsonb_build_object('item_id', id, 'sent_quantity', quantity)) from public.commissary_order_items where order_id = (v_res ->> 'id')::uuid));
+
+  -- Today's sales so far (entered by management until Toast is connected)
+  perform public.save_daily_sales(jsonb_build_object('business_date', (now() at time zone 'America/New_York')::date,
+    'lines', (select jsonb_agg(jsonb_build_object('recipe_id', rc.id, 'quantity', x.q, 'net_amount', round(x.q * rc.selling_price, 2)))
+                from (values ('Cheeseburger', 24), ('Chicken Sandwich', 18), ('Margherita Pizza', 12), ('Spaghetti & Meatballs', 6),
+                             ('French Fries', 30), ('Fountain Soda', 20)) x(n, q)
+                join public.recipes rc on rc.name = x.n)));
 
   -- Past deliveries (entered by management) -------------------------------------
   v_res := public.submit_receiving(jsonb_build_object(

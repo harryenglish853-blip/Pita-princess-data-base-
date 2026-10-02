@@ -8,8 +8,9 @@ test.beforeAll(() => resetDemo());
 const MANAGEMENT_PAGES = ['/dashboard', '/inventory', '/counts', '/receiving', '/receiving/new', '/ordering', '/vendors', '/waste', '/transfers',
   '/tasks', '/alerts', '/employees', '/reports', '/reports/waste', '/reports/deliveries', '/reports/price-history', '/reports/inventory-value',
   '/reports/variance', '/reports/employee-activity', '/more', '/search?q=chick',
-  '/commissary', '/commissary/new', '/commissary/new?suggested=1', '/commissary/production', '/commissary/production/new'];
-const OWNER_ONLY = ['/admin', '/admin/settings', '/admin/accounts', '/admin/storage', '/admin/count-order', '/admin/catalog', '/admin/audit'];
+  '/commissary', '/commissary/new', '/commissary/new?suggested=1', '/commissary/production', '/commissary/production/new',
+  '/recipes', '/recipes/new', '/sales'];
+const OWNER_ONLY = ['/reports/food-cost', '/reports/food-cost?view=product', '/reports/food-cost?view=recipe', '/reports/food-cost?view=day', '/admin', '/admin/settings', '/admin/accounts', '/admin/storage', '/admin/count-order', '/admin/catalog', '/admin/audit'];
 
 async function visitAll(page: import('@playwright/test').Page, paths: string[], shotPrefix: string, project: string) {
   for (const path of paths) {
@@ -34,8 +35,9 @@ test('owner: every page', async ({ page }, info) => {
   const employee = (await sql<{ id: string }>(`select id from employees where display_name='Carlos'`))[0].id;
   const count = (await sql<{ id: string }>(`select id from inventory_count_sessions limit 1`))[0].id;
   const co = (await sql<{ id: string }>(`select id from commissary_orders limit 1`))[0].id;
+  const recipe = (await sql<{ id: string }>(`select id from recipes where name = 'Cheeseburger'`))[0].id;
   await visitAll(page, [...MANAGEMENT_PAGES, ...OWNER_ONLY, `/inventory/products/${product}`, `/inventory/products/${product}/edit`, '/inventory/products/new',
-    `/receiving/${receipt}`, `/vendors/${vendor}`, '/vendors/new', `/employees/${employee}`, `/counts/${count}`, `/commissary/${co}`, `/commissary/${co}/receive`], 'owner', info.project.name);
+    `/receiving/${receipt}`, `/vendors/${vendor}`, '/vendors/new', `/employees/${employee}`, `/counts/${count}`, `/commissary/${co}`, `/commissary/${co}/receive`, `/recipes/${recipe}`, `/recipes/${recipe}/edit`], 'owner', info.project.name);
   expect(errors).toEqual([]);
 });
 
@@ -43,7 +45,7 @@ test('management: every page; owner-only pages are refused', async ({ page }, in
   const errors = watchConsole(page);
   await login(page, 'manager@demo.local');
   await visitAll(page, MANAGEMENT_PAGES, 'manager', info.project.name);
-  for (const p of ['/admin/accounts', '/admin/settings', '/admin/audit']) {
+  for (const p of ['/admin/accounts', '/admin/settings', '/admin/audit', '/reports/food-cost']) {
     await page.goto(p);
     await expect(page, p).toHaveURL(/\/forbidden$/);
   }

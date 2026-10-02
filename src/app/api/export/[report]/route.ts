@@ -2,13 +2,14 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { getContext, can } from '@/lib/auth/context';
 import { resolveRange, instantRange } from '@/lib/dates';
 import { activityRows, deliveryRows, priceRows, wasteRows } from '@/lib/reports';
-import { query } from '@/lib/data';
+import { query, rpc } from '@/lib/data';
+import type { FoodCostReport } from '@/lib/foodcost';
 import { toCsv } from '@/lib/csv';
 import { DEFAULT_TZ } from '@/lib/format';
 
 const PERMS: Record<string, string> = {
   inventory: 'inventory.view', waste: 'waste.review', 'employee-activity': 'employees.view_activity',
-  deliveries: 'receiving.review', 'price-history': 'inventory.view', variance: 'counts.post', audit: 'audit.view',
+  deliveries: 'receiving.review', 'price-history': 'inventory.view', variance: 'counts.post', audit: 'audit.view', 'food-cost': 'reports.financial',
 };
 
 function fmtTs(v: string, tz: string) {
@@ -53,6 +54,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ repo
       csv = toCsv(['Delivery date', 'Vendor', 'Invoice', 'Receipt', 'Received by', ...(fin ? ['Received value', 'Invoiced value'] : []), 'Possible credit due', 'Discrepancies'],
         rows.map((d) => [d.delivery_date, d.vendors?.name, d.invoice_number, d.receipt_number, d.employees?.display_name ?? d.account?.display_name,
           ...(fin ? [d.received_total, d.invoiced_total] : []), d.credit_due_estimate, d.delivery_discrepancies.map((x) => `${x.discrepancy_type}: ${x.description} (${x.status})`).join(' | ')]));
+      break;
+    }
+    case 'food-cost': {
+      const d = await rpc<FoodCostReport>('food_cost_report', { p_from: r.from, p_to: r.to });
+      csv = toCsv(['Product', 'Category', 'Unit', 'Beginning qty', 'Beginning $', 'Received qty', 'Received $', 'Theoretical usage qty', 'Theoretical $',
+        'Waste qty', 'Waste $', 'Expected qty', 'Ending qty', 'Ending $', 'Actual usage qty', 'Actual $', 'Variance $'],
+        d.products.map((p) => [p.name, p.category, p.inventory_unit, p.begin_qty, p.begin_value, p.purchased_qty, p.purchased_value, p.theoretical_qty, p.theoretical_value,
+          p.waste_qty, p.waste_value, p.expected_qty, p.end_qty, p.end_value, p.actual_qty, p.actual_value, p.variance_value]));
       break;
     }
     case 'price-history': {

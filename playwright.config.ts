@@ -25,7 +25,7 @@ export default defineConfig({
   },
   projects: [
     { name: 'phone', use: { ...devices['Pixel 7'], launchOptions } },
-    { name: 'tablet', testIgnore: /demo-flow|ordering|commissary/, use: { viewport: { width: 820, height: 1180 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2, launchOptions } },
-    { name: 'desktop', testIgnore: /demo-flow|ordering|commissary/, use: { viewport: { width: 1440, height: 900 }, launchOptions } },
+    { name: 'tablet', testIgnore: /demo-flow|ordering|commissary|foodcost/, use: { viewport: { width: 820, height: 1180 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2, launchOptions } },
+    { name: 'desktop', testIgnore: /demo-flow|ordering|commissary|foodcost/, use: { viewport: { width: 1440, height: 900 }, launchOptions } },
   ],
 });

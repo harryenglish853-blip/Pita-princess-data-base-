@@ -263,7 +263,10 @@ test('owner control center shows values derived from data; nothing invented', as
   const errors = watchConsole(page);
   await login(page, 'owner1@demo.local');
   await expect(page.getByRole('heading', { name: 'Restaurant control center' })).toBeVisible();
-  await expect(page.getByText('Not connected')).toBeVisible();
+  // sales come from entered sales (Toast import is Phase 6); food cost % is derived from them
+  const sales = (await sql<{ v: string }>(`select coalesce(sum(net_amount),0) v from sales_transactions where not is_void and business_date between (now() at time zone 'America/New_York')::date - extract(dow from (now() at time zone 'America/New_York'))::int and (now() at time zone 'America/New_York')::date`))[0].v;
+  await expect(page.locator('a[href="/sales"]', { hasText: '$' })).toContainText(`$${Number(sales).toLocaleString('en-US', { minimumFractionDigits: 2 })}`);
+  await expect(page.locator('a[href="/reports/food-cost"]').first()).toContainText('%');
   const value = (await sql<{ v: string }>(`select round(sum(inventory_value),2) v from inventory_on_hand o join locations l on l.id=o.location_id where l.code='MAIN' and o.is_active`))[0].v;
   await expect(page.getByRole('link', { name: /Inventory value/ })).toContainText(`$${Number(value).toLocaleString('en-US', { minimumFractionDigits: 2 })}`);
   await expectNoHorizontalOverflow(page);

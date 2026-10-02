@@ -83,7 +83,7 @@ test('Carlos receives it on the shared login: 95 of 100 meatballs; out 95 / in 9
   expect(errors).toEqual([]);
 });
 
-test('management sees the differences; production batch pre-fills from the last batch and is costed', async ({ page }) => {
+test('management sees the differences; production batch pre-fills from the Marinara recipe and is costed', async ({ page }) => {
   const errors = watchConsole(page);
   await login(page, 'manager@demo.local');
   await page.goto(`/commissary/${orderId}`);
@@ -92,13 +92,15 @@ test('management sees the differences; production batch pre-fills from the last 
   await page.goto('/commissary/production/new');
   await page.getByPlaceholder(/Finished product/).fill('marinara');
   await page.getByRole('button', { name: /Marinara/ }).click();
-  await expect(page.getByText(/Filled in from the last Marinara batch/)).toBeVisible();
+  await expect(page.getByText(/Filled in from the Marinara recipe for 20 QT/)).toBeVisible();
   await expect(page.getByLabel('Amount made')).toHaveValue('20');
   await expect(page.getByLabel('Tomato used', { exact: true })).toHaveValue('16');
+  // half a batch: the recipe scales the ingredients
   await page.getByLabel('Amount made').fill('10');
-  await page.getByLabel('Tomato used', { exact: true }).fill('8');
-  await page.getByLabel('Cooking Oil (Fryer) used', { exact: true }).fill('0.25');
-  await page.getByLabel('Yellow Onion used', { exact: true }).fill('1');
+  await page.getByRole('button', { name: 'SCALE RECIPE TO 10 QT' }).click();
+  await expect(page.getByLabel('Tomato used', { exact: true })).toHaveValue('8');
+  await expect(page.getByLabel('Cooking Oil (Fryer) used', { exact: true })).toHaveValue('0.25');
+  await expect(page.getByLabel('Yellow Onion used', { exact: true })).toHaveValue('1');
   await page.getByRole('button', { name: 'RECORD BATCH' }).click();
   // 8 x 1.45 + 0.25 x 9.50 + 1 x 0.65 = 14.625 -> $14.63 for 10 QT
   await expect(page.getByText(/Batch #\d+ recorded/)).toBeVisible();

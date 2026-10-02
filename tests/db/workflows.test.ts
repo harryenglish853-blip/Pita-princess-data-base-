@@ -65,6 +65,7 @@ describe('DEMO: Carlos receives a Sysco delivery with a short shipment', () => {
   it('posts only the received quantity and flags the discrepancy', async () => {
     token = await pin('Carlos', '4826');
     before = await balance('P-CHKBR');
+    const tomatoBefore = await balance('P-TOMATO');
     const payload = {
       idempotency_key: key, vendor_id: I.vendor('SYSCO'), invoice_number: '83923',
       delivery_date: new Date().toISOString().slice(0, 10), temperature_ok: true,
@@ -84,7 +85,7 @@ describe('DEMO: Carlos receives a Sysco delivery with a short shipment', () => {
     // weighted average: (60 LB x 3.20 + 160 x 3.20) / 220 = 3.20 (same price)
     expect(after.avg).toBe(3.2);
     const tomato = await balance('P-TOMATO');
-    expect(tomato.qty).toBe(20 + 50);
+    expect(tomato.qty).toBe(tomatoBefore.qty + 50); // 2 cases x 25 LB
 
     const ev = (await db.query('select * from public.receiving_events where id = $1', [eventId])).rows[0];
     expect(ev.employee_id).toBe(I.employee('Carlos'));
@@ -334,8 +335,10 @@ describe('DEMO: weekly inventory — book vs physical, recount, post', () => {
   it('dashboard reflects the posted variance and derives numbers from data', async () => {
     const today = new Date().toISOString().slice(0, 10);
     const owner = (await asUser(db, { userId: I.owner1 }, (q) => q(`select public.dashboard_metrics(current_date - 7, current_date) m`)))[0].m;
-    expect(owner.sales.connected).toBe(false);
-    expect(owner.sales.amount).toBeNull();
+    // demo sales were entered for today: sales come from them, not from nothing
+    const sales = (await db.query(`select coalesce(sum(net_amount),0) v from public.sales_transactions where not is_void and business_date between current_date - 7 and current_date`)).rows[0].v;
+    expect(owner.sales.connected).toBe(true);
+    expect(n(owner.sales.amount)).toBe(n(sales));
     expect(owner.purchases).not.toBeNull();
     const posted = (await db.query(`select coalesce(sum(variance_value),0) v from public.inventory_count_sessions where status='POSTED' and posted_at > now() - interval '8 days'`)).rows[0].v;
     expect(n(owner.inventory_variance)).toBe(n(posted));
@@ -343,6 +346,8 @@ describe('DEMO: weekly inventory — book vs physical, recount, post', () => {
     expect(n(owner.inventory_value)).toBe(n(inv));
     const manager = (await asUser(db, mgr(), (q) => q(`select public.dashboard_metrics($1::date, $1::date) m`, [today])))[0].m;
     expect(manager.purchases).toBeNull(); // financial figures hidden from management by default
+    expect(manager.sales.amount).toBeNull();
+    expect(manager.food_cost.actual_pct).toBeNull();
   });
 
   it('book changes after submission send the count back to review instead of posting stale numbers', async () => {

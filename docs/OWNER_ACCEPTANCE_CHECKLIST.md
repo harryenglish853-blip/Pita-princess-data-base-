@@ -50,8 +50,13 @@ Initial each line, with the date.
       the restaurant with one item short, and check the alert and both locations' on-hand
 - [ ] Record one real production batch and check the finished-product cost
 
+- [ ] Recipes: enter your real menu recipes (and sub-recipes like sauces), check each cost per
+      portion and food cost % against your own numbers
+- [ ] Enter one real day of sales from the Toast product-mix report; check the ingredient usage on
+      a few products and the food cost report after the next full count
+
 ## Not yet available (do not plan operations around these)
-- [ ] Understood: recipes/food cost, Toast sales,
+- [ ] Understood: Toast sales import,
       immediate alert emails, monthly report, advanced forecasting, barcode camera and voice counts are later phases
 
 Signed (Owner #1): ____________  Date: ______   Signed (Owner #2): ____________  Date: ______

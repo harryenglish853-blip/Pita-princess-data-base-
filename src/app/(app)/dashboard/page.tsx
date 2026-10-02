@@ -3,7 +3,7 @@ import { requireContext, can, type AppContext } from '@/lib/auth/context';
 import { rpc, query } from '@/lib/data';
 import type { AttentionItem, DashboardMetrics, TaskRow } from '@/lib/types';
 import { resolveRange } from '@/lib/dates';
-import { fmtMoney, fmtDate, fmtTime, todayInTz, DEFAULT_TZ } from '@/lib/format';
+import { fmtMoney, fmtDate, fmtPct, fmtTime, todayInTz, DEFAULT_TZ } from '@/lib/format';
 import { Card, CardTitle, LinkButton, PageHeader, Stat, Badge } from '@/components/ui';
 import { AttentionList } from '@/components/dashboard/AttentionList';
 import { endEmployeeSession } from '@/lib/auth/actions';
@@ -97,9 +97,11 @@ async function OwnerDashboard({ ctx }: { ctx: AppContext }) {
       <PageHeader title="Restaurant control center" subtitle={`This week · ${fmtDate(r.from)} – ${fmtDate(r.to)}`}
         actions={<LinkButton href="/reports" variant="secondary">Reports</LinkButton>} />
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-        <Stat label="Sales" value="Not connected" sub="Toast integration is a later phase" />
-        <Stat label="Actual food cost" value="—" sub="Needs Toast sales + recipes" />
-        <Stat label="Theoretical food cost" value="—" sub="Needs Toast sales + recipes" />
+        <Stat label="Sales" value={m.sales.connected ? fmtMoney(m.sales.amount) : '—'} sub={m.sales.note} href="/sales" />
+        <Stat label="Actual food cost" value={m.food_cost.actual_pct === null ? '—' : fmtPct(m.food_cost.actual_pct)} sub={m.food_cost.note} href="/reports/food-cost" />
+        <Stat label="Theoretical food cost" value={m.food_cost.theoretical_pct === null ? '—' : fmtPct(m.food_cost.theoretical_pct)}
+          sub={m.food_cost.variance_pts === null ? 'Sales × recipe cost' : `Variance ${m.food_cost.variance_pts > 0 ? '+' : ''}${m.food_cost.variance_pts} pts`}
+          tone={m.food_cost.variance_pts !== null && m.food_cost.variance_pts > 1 ? 'warn' : undefined} href="/reports/food-cost" />
         <Stat label="Inventory value" value={fmtMoney(m.inventory_value)} href="/inventory" />
         <Stat label="Purchases" value={fmtMoney(m.purchases)} sub={`${m.deliveries} deliveries`} href="/receiving" />
         <Stat label="Waste" value={fmtMoney(m.waste.amount)} sub={`${m.waste.entries} entries`} href="/reports/waste" />

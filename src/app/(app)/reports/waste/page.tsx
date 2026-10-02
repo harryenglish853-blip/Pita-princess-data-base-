@@ -37,10 +37,12 @@ export default async function WasteReport({ searchParams }: { searchParams: Prom
   const sp = await searchParams;
   const r = resolveRange(sp.range, sp.from, sp.to, tz);
   const { start, end } = instantRange(r.from, r.to, tz);
-  const [rows, reasons] = await Promise.all([
+  const [rows, reasons, sales] = await Promise.all([
     wasteRows(start, end),
     query<{ code: string; label: string }[]>((s) => s.from('waste_reasons').select('code, label')),
+    query<{ net_amount: number }[]>((s) => s.from('sales_transactions').select('net_amount').eq('is_void', false).gte('business_date', r.from).lte('business_date', r.to)),
   ]);
+  const salesTotal = sales.reduce((a, x) => a.add(x.net_amount), new Decimal(0));
   const label = (c: string) => reasons.find((x) => x.code === c)?.label ?? c;
   const total = rows.reduce((a, w) => a.add(w.total_cost), new Decimal(0));
   const byDay = groupSum(rows, (w) => new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date(w.occurred_at)), (w) => w.total_cost).sort((a, b) => a.key.localeCompare(b.key));
@@ -52,7 +54,8 @@ export default async function WasteReport({ searchParams }: { searchParams: Prom
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
         <Stat label="Waste cost" value={fmtMoney(total.toString())} />
         <Stat label="Entries" value={rows.length} />
-        <Stat label="Waste % of sales" value="—" sub="Needs Toast sales (Phase 6)" />
+        <Stat label="Waste % of sales" value={salesTotal.gt(0) ? `${total.div(salesTotal).mul(100).toFixed(1)}%` : '—'}
+          sub={salesTotal.gt(0) ? `of ${fmtMoney(salesTotal.toString())} sales` : 'No sales entered for this period'} />
       </div>
       {rows.length === 0 ? <EmptyState title="No waste in this period" /> : (
         <div className="space-y-4">

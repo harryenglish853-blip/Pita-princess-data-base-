@@ -29,26 +29,36 @@ export function ProductionForm({ products, units, locations, defaultLocation }: 
   const [key] = useState(newKey);
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [fromRecipe, setFromRecipe] = useState(false);
   const [done, setDone] = useState<{ batch_number: number; total_cost: number; unit_cost: number } | null>(null);
   const [pending, start] = useTransition();
   const set = (i: number, patch: Partial<Ing>) => setIngs((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
+
+  function applyTemplate(p: CatalogProduct, quantity?: number, unitCode?: string) {
+    start(async () => {
+      const r = await productionTemplate(p.id, quantity, unitCode).catch(() => null);
+      if (r?.ok && r.data && r.data.ingredients?.length) {
+        const t = r.data;
+        setQty(String(Number(t.quantity)));
+        setUnit(t.unit_code);
+        setIngs(t.ingredients.filter((i) => byId.has(i.product_id)).map((i) => ({ product_id: i.product_id, qty: String(Number(i.quantity)), unit: i.unit_code })));
+        setFromRecipe(t.source === 'recipe');
+        setInfo(t.source === 'recipe'
+          ? `Filled in from the ${t.recipe_name} recipe for ${Number(t.quantity)} ${t.unit_code}. Change the amounts to what was actually used.`
+          : `Filled in from the last ${p.name} batch. Change the amounts to what was actually used.`);
+      } else if (quantity === undefined) {
+        setIngs([]);
+        setFromRecipe(false);
+        setPicking(true);
+      }
+    });
+  }
 
   function pickOutput(p: CatalogProduct) {
     setOutput(p);
     setUnit(p.inventory_unit);
     setInfo(null);
-    start(async () => {
-      const r = await productionTemplate(p.id).catch(() => null);
-      if (r?.ok && r.data && r.data.ingredients?.length) {
-        setQty(String(Number(r.data.quantity)));
-        setUnit(r.data.unit_code);
-        setIngs(r.data.ingredients.filter((i) => byId.has(i.product_id)).map((i) => ({ product_id: i.product_id, qty: String(Number(i.quantity)), unit: i.unit_code })));
-        setInfo(`Filled in from the last ${p.name} batch. Change the amounts to what was actually used.`);
-      } else {
-        setIngs([]);
-        setPicking(true);
-      }
-    });
+    applyTemplate(p);
   }
 
   function submit() {
@@ -98,7 +108,7 @@ export function ProductionForm({ products, units, locations, defaultLocation }: 
           <div className="rounded-xl border border-slate-200 p-3">
             <div className="mb-2 flex items-start justify-between gap-2">
               <p className="text-lg font-bold">{output.name}</p>
-              <button type="button" className="text-sm text-slate-500" onClick={() => { setOutput(null); setIngs([]); setInfo(null); }}>Change</button>
+              <button type="button" className="text-sm text-slate-500" onClick={() => { setOutput(null); setIngs([]); setInfo(null); setFromRecipe(false); }}>Change</button>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <Field label="Amount made"><QtyInput aria-label="Amount made" value={qty} onChange={(e) => setQty(e.target.value)} /></Field>
@@ -121,6 +131,14 @@ export function ProductionForm({ products, units, locations, defaultLocation }: 
         <Card className="space-y-3">
           <p className="font-bold">Ingredients used</p>
           {info && <p className="text-sm text-slate-600" role="status">{info}</p>}
+          {fromRecipe && (
+            <Button variant="secondary" disabled={pending} onClick={() => {
+              const q = parseQty(qty);
+              if (q === null || Number.isNaN(q) || q <= 0) return setErr(`Enter how much ${output.name} was made first.`);
+              setErr(null);
+              applyTemplate(output, q, unit);
+            }}>SCALE RECIPE TO {qty || '…'} {unit}</Button>
+          )}
           {ings.map((l, i) => {
             const p = byId.get(l.product_id);
             if (!p) return null;
@@ -139,7 +157,7 @@ export function ProductionForm({ products, units, locations, defaultLocation }: 
             <ProductPicker products={products.filter((p) => p.id !== output.id)} exclude={ings.map((i) => i.product_id)} autoFocus placeholder="Add ingredient"
               onPick={(p) => { setIngs((ls) => [...ls, { product_id: p.id, qty: '', unit: p.inventory_unit }]); setPicking(false); }} />
           ) : <Button variant="secondary" className="w-full" onClick={() => setPicking(true)}>+ Add ingredient</Button>}
-          <p className="text-xs text-slate-500">Recipes (Phase 5) will fill these in automatically.</p>
+          {!fromRecipe && <p className="text-xs text-slate-500">Tip: give {output.name} a prep recipe (Recipes) and its ingredients fill in automatically.</p>}
         </Card>
       )}
 

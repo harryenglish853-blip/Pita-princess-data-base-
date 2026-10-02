@@ -1,8 +1,8 @@
 # Restaurant Inventory — private operations website
 
 A private, mobile-first **website** (not an app-store app) for restaurant inventory, receiving, waste,
-transfers, physical counts and (in later phases) purchasing, recipes, food cost, Toast
-sales and automated email reports. It is **not** a public site and **not** an app-store
+transfers, physical counts, ordering, the commissary, recipes and food cost, daily sales and
+email reports (Toast POS import in a later phase). It is **not** a public site and **not** an app-store
 app: staff open a private URL on phones, tablets or computers and can add it to their
 home screen (PWA).
 
@@ -57,7 +57,7 @@ Carlos and Maria share one login.
   was received (commissary out = restaurant in), and any shortage is flagged to management.
 - **Production**: record a batch (e.g. 20 QT Marinara from tomatoes, oil, onion). Ingredients leave
   inventory; the finished product comes in at the cost of the ingredients used. The next batch
-  pre-fills from the last one (recipes in Phase 5 will fill it automatically).
+  pre-fills from the product's prep recipe (scaled to the batch), or else from the last batch.
 - Employee profile management (add, rename, reset PIN, deactivate — history kept)
 
 - **Invoice photos are required** for every delivery (by hand or against a logged order); several
@@ -67,7 +67,18 @@ Carlos and Maria share one login.
   credit due, **invoice photos attached**, orders logged, waste, low stock, price changes, counts,
   employee activity, open alerts. Preview / send now / history in Administration → Email reports.
 
-Not built yet (clearly labeled in the app): recipes and food cost (Phase 5), Toast integration (Phase 6), immediate alert emails and the monthly owner report (rest of Phase 7), forecasting / barcode camera / voice / OCR (Phase 8).
+- **Recipes & food cost**: menu items and prep recipes with nested sub-recipes (e.g. House Sauce in
+  several sandwiches; loops are rejected). Cost per portion, food cost % and margin are calculated
+  live from current ingredient costs, so a price change flows through every recipe that uses it.
+- **Daily sales** (entered per menu item until Toast is connected): each sale posts its ingredient
+  usage to inventory through the recipes (theoretical usage). Re-saving a day never double counts;
+  changes and voids reverse and re-post. Sales without a recipe stay UNMAPPED and post nothing.
+- **Actual vs theoretical food cost** (owners): actual = beginning inventory + purchases − ending
+  inventory (food items, from the ledger); theoretical = sales × recipe usage; variance in $ and
+  points, drill down by category, product (beginning / received / theoretical / waste / expected /
+  ending / unexplained), menu item and day; CSV. The owner control center shows the same numbers.
+
+Not built yet (clearly labeled in the app): Toast integration (Phase 6), immediate alert emails and the monthly owner report (rest of Phase 7), forecasting / barcode camera / voice / OCR (Phase 8).
 
 ## Technology
 
